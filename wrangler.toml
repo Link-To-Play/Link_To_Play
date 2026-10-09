@@ -1,0 +1,6 @@
+name = "hari-player"
+compatibility_date = "2025-01-01"
+
+# serves index.html + manifest.json + icons directly — no Worker code needed
+[assets]
+directory = "."

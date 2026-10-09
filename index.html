@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Stream Player v2</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stream">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    #stage {
+        position: fixed;
+        inset: 0;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        touch-action: none; /* we own all gestures */
+        user-select: none;
+        -webkit-user-select: none;
+    }
+    video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* ============ TOP-LEFT TITLE ============ */
+    #titleBar {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        padding: 26px 30px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 10;
+        background: linear-gradient(to bottom, rgba(0,0,0,0.55), transparent);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+        pointer-events: none;
+    }
+    #titleBar .accent {
+        width: 4px;
+        /* cap unit = the font's real cap height, so the bar is exactly as
+           tall as the title glyphs — not the em box around them */
+        height: 0.72em;
+        height: 1cap;
+        font-family: 'Bebas Neue', 'Inter', sans-serif;
+        font-size: 30px;
+        background: #e50914;
+        border-radius: 2px;
+        flex-shrink: 0;
+        transform: translateY(2px);   /* optical nudge: sit dead-center on the caps */
+    }
+    #titleBar .name {
+        color: #fff;
+        font-family: 'Bebas Neue', 'Inter', sans-serif;
+        font-size: 30px; font-weight: 400;
+        letter-spacing: 0.14em; text-transform: uppercase;
+        /* line-height = cap height → the flex item IS the cap box, so
+           align-items:center puts bar and glyphs on the same optical axis */
+        line-height: 0.72;
+        line-height: 1cap;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+    }
+
+    /* ============ BOTTOM CONTROL BAR ============ */
+    #controls {
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        padding: 18px 26px calc(18px + env(safe-area-inset-bottom));
+        background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
+        transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+    #stage.hide-ui #controls,
+    #stage.hide-ui #titleBar { opacity: 0; pointer-events: none; }
+    #stage.hide-ui #controls { transform: translateY(6px); }
+    #stage.hide-ui #titleBar { transform: translateY(-6px); }
+
+    .ctl-btn {
+        background: none; border: none; color: #fff; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        padding: 4px; flex-shrink: 0;
+    }
+    .ctl-btn svg { width: 30px; height: 30px; fill: #fff; display: block; }
+    .ctl-btn:active { transform: scale(0.92); }
+
+    /* ============ PROGRESS SLIDER (white track / red watched) ============ */
+    #seek {
+        -webkit-appearance: none; appearance: none;
+        flex: 1; height: 4px; border-radius: 2px;
+        background: rgba(255,255,255,0.9);
+        outline: none; cursor: pointer;
+    }
+    #seek::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #e50914; border: none;
+        box-shadow: 0 0 6px rgba(0,0,0,0.5);
+    }
+    #seek::-moz-range-thumb {
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #e50914; border: none;
+    }
+    #seek::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.9); }
+    #seek::-moz-range-progress { height: 4px; border-radius: 2px; background: #e50914; }
+
+    #timeLabel {
+        color: #fff; font-size: 13.5px; font-weight: 500;
+        font-family: 'Inter', sans-serif;
+        font-feature-settings: 'tnum';
+        white-space: nowrap; flex-shrink: 0;
+        text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* ============ VOLUME POPUP — VLC-style capsule slider ============ */
+    #volWrap { position: relative; flex-shrink: 0; }
+    #volPop {
+        position: absolute; bottom: 52px; left: 50%;
+        transform: translateX(-50%) translateY(8px) scaleY(0.85);
+        transform-origin: bottom;
+        background: rgba(0,0,0,0.55);
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border-radius: 22px; padding: 14px 13px;
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34,1.3,0.64,1);
+        display: flex; flex-direction: column; align-items: center; gap: 10px;
+    }
+    #volWrap.open #volPop {
+        opacity: 1; transform: translateX(-50%) translateY(0) scaleY(1);
+        pointer-events: auto;
+    }
+    #volPop .vp-icon { width: 20px; height: 20px; flex-shrink: 0; }
+    #volPop .vp-icon path { fill: #fff; }
+    #volTrack {
+        width: 26px; height: 120px;
+        display: flex; align-items: center; justify-content: center;
+        cursor: pointer; touch-action: none;
+    }
+    .vp-rail {
+        position: relative;
+        width: 5px; height: 100%;
+        border-radius: 3px;
+        background: rgba(255,255,255,0.22);
+        overflow: visible;
+    }
+    .vp-fill {
+        position: absolute; bottom: 0; left: 0; right: 0;
+        height: 100%;
+        background: #fff;
+        border-radius: 3px;
+    }
+    .vp-thumb {
+        position: absolute; left: 50%; bottom: 100%;
+        width: 13px; height: 13px;
+        transform: translate(-50%, 50%);
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 0 0 0 4px rgba(255,255,255,0.18), 0 1px 4px rgba(0,0,0,0.5);
+    }
+    #volPop .vol-pct {
+        color: #fff; font-family: 'Inter', sans-serif;
+        font-size: 11px; font-weight: 600;
+        font-feature-settings: 'tnum';
+        min-width: 30px; text-align: center;
+    }
+
+    /* ============ SPINNER / BIG PLAY / ERROR ============ */
+    #spinner {
+        position: absolute; width: 52px; height: 52px;
+        border: 4px solid rgba(255,255,255,0.15);
+        border-top-color: #e50914; border-radius: 50%;
+        animation: spin 0.9s linear infinite; z-index: 20;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #spinner.hidden { display: none; }
+
+    /* ============ CENTER ICON — YouTube-style bare glyph ============
+       Just the white play triangle / pause bars over the frame — no
+       circle, border, background, or glow. pointer-events:none so taps
+       pass straight through to the gesture layer (no duplicate control).
+       Paused: sticky play icon. Playing: brief icon flash on toggle. */
+    #centerIcon {
+        position: absolute; inset: 0; margin: auto;
+        width: 76px; height: 76px;
+        z-index: 15;
+        display: flex; align-items: center; justify-content: center;
+        pointer-events: none;
+        opacity: 0;
+        transform: scale(0.92);
+        transition: opacity 200ms ease, transform 200ms ease;
+    }
+    #centerIcon.on { opacity: 1; transform: scale(1); }
+    #centerIcon svg {
+        width: 60px; height: 60px; fill: #fff;
+        /* legibility over bright frames — shadow is the only dressing */
+        filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.65));
+    }
+
+    #err {
+        position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%);
+        z-index: 30; background: rgba(20,20,30,0.95);
+        border: 1px solid rgba(255,107,107,0.4); color: #ff9b9b;
+        border-radius: 10px; padding: 12px 18px; font-size: 14px;
+        display: none; max-width: 90%; text-align: center;
+    }
+
+    /* ============ GESTURE HUD — VLC-style edge sliders ============
+       Thin vertical capsule pinned to the screen edge: icon on top, tall
+       rounded track, white fill rising from the bottom, % readout. */
+    .edge-slider {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 25;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        background: rgba(0, 0, 0, 0.45);
+        border-radius: 26px;
+        padding: 16px 11px;
+        pointer-events: none;
+    }
+    .edge-slider.show { display: flex; }
+    #volEdge { left: 14px; }
+    #briEdge { right: 14px; }
+    .edge-icon { width: 22px; height: 22px; flex-shrink: 0; }
+    .edge-icon path { fill: #fff; }
+    .edge-track {
+        width: 5px;
+        height: 38vh;
+        border-radius: 3px;
+        background: rgba(255, 255, 255, 0.22);
+        position: relative;
+        overflow: hidden;
+    }
+    .edge-fill {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        height: 50%;
+        background: #fff;
+        border-radius: 3px;
+    }
+    .edge-pct {
+        color: #fff;
+        font-family: 'Inter', sans-serif;
+        font-size: 11px; font-weight: 600;
+        font-feature-settings: 'tnum';
+        min-width: 30px; text-align: center;
+    }
+
+    /* 2x speed badge top-center */
+    #speedBadge {
+        position: absolute; top: 22px; left: 50%; transform: translateX(-50%);
+        z-index: 25; background: rgba(0,0,0,0.7);
+        border-radius: 20px; padding: 8px 18px;
+        color: #fff; font-size: 14px; font-weight: 700;
+        display: none; align-items: center; gap: 8px;
+        pointer-events: none;
+    }
+    #speedBadge.show { display: flex; }
+    #speedBadge svg { width: 16px; height: 16px; fill: #fff; }
+
+    /* ============ SEEK FEEDBACK — YouTube-style ripple ============
+       Circular ripple expanding from the tap point + rewind/ff icon +
+       accumulating "±N seconds" pill. Repeats restart cleanly. */
+    .seek-fx {
+        position: absolute;
+        z-index: 24;
+        display: flex; flex-direction: column;
+        align-items: center; gap: 8px;
+        transform: translate(-50%, -50%);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease;
+    }
+    .seek-fx.show { opacity: 1; }
+    .seek-ripple {
+        position: absolute;
+        width: 130px; height: 130px;
+        top: 50%; left: 50%;
+        transform: translate(-50%, -50%) scale(0.3);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.07);
+        border: 1.5px solid rgba(229, 9, 20, 0.45);   /* red accent ring */
+        z-index: -1;
+    }
+    .seek-fx.show .seek-ripple {
+        animation: seekRipple 0.55s cubic-bezier(0.2, 0.6, 0.35, 1) forwards;
+    }
+    @keyframes seekRipple {
+        0%   { transform: translate(-50%,-50%) scale(0.25); opacity: 0.9; }
+        100% { transform: translate(-50%,-50%) scale(1.6);  opacity: 0; }
+    }
+    .seek-ico {
+        width: 30px; height: 30px; fill: #fff;
+        filter: drop-shadow(0 1px 4px rgba(0,0,0,0.6));
+        transform: translateY(0);
+    }
+    .seek-fx.show .seek-ico { animation: seekIco 0.45s cubic-bezier(0.34,1.4,0.64,1); }
+    @keyframes seekIco {
+        from { transform: translateY(4px) scale(0.8); opacity: 0; }
+        to   { transform: translateY(0) scale(1); opacity: 1; }
+    }
+    .seek-lbl {
+        color: #fff;
+        font-family: 'Inter', sans-serif;
+        font-size: 12.5px; font-weight: 600;
+        background: rgba(0, 0, 0, 0.55);
+        border-radius: 14px;
+        padding: 5px 12px;
+        white-space: nowrap;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+    }
+
+    /* ============ SETTINGS DRAWER — right-anchored panel ============
+       Lives INSIDE #stage so it renders while stage is fullscreen. */
+    #drawerOverlay {
+        position: absolute; inset: 0; z-index: 38;
+        display: none;
+    }
+    #drawerOverlay.open { display: block; }
+    #settingsDrawer {
+        position: absolute;
+        top: 12px; right: 12px; bottom: 12px;
+        width: min(340px, 92vw);
+        z-index: 39;
+        background: rgba(16,16,20,0.92);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 14px;
+        overflow-y: auto;
+        transform: translateX(110%);
+        visibility: hidden;
+        transition: transform 0.28s cubic-bezier(0.32,0.72,0.28,1),
+                    visibility 0.28s;
+        touch-action: pan-y;   /* drawer scrolls on touch despite stage's
+                                  touch-action:none */
+        overscroll-behavior: contain;
+    }
+    #settingsDrawer.open { transform: translateX(0); visibility: visible; }
+
+    .dr-head {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 16px 18px 8px;
+        position: sticky; top: 0;
+        background: inherit; z-index: 2;
+    }
+    .dr-head h3 { font-size: 17px; color: #fff; font-weight: 600; }
+    .dr-close {
+        background: none; border: none; color: #cfcfe0;
+        font-size: 18px; cursor: pointer; padding: 4px; line-height: 1;
+    }
+
+    .dr-row {
+        display: flex; align-items: center; gap: 14px;
+        width: 100%; padding: 13px 18px;
+        background: none; border: none;
+        color: #e5e5e5; font-family: 'Inter', sans-serif;
+        font-size: 14px; font-weight: 500; text-align: left;
+        cursor: pointer; text-decoration: none;
+    }
+    .dr-row:hover { background: rgba(255,255,255,0.06); }
+    .dr-row > svg { width: 20px; height: 20px; fill: #e5e5e5; flex-shrink: 0; }
+    .dr-val { margin-left: auto; color: #9a9ab0; font-size: 13px; font-weight: 400; }
+    .dr-chev {
+        width: 16px; height: 16px; fill: #9a9ab0;
+        margin-left: auto; flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+    .dr-row.expanded .dr-chev { transform: rotate(180deg); }
+    .dr-row .dr-val + .dr-chev { margin-left: 10px; }
+
+    .dr-sec { display: none; padding: 2px 0 12px; }
+    .dr-sec.open { display: block; }
+
+    /* toggle switch */
+    .switch {
+        margin-left: auto; flex-shrink: 0;
+        width: 38px; height: 21px; border-radius: 11px;
+        background: rgba(255,255,255,0.18);
+        position: relative; transition: background 0.2s ease;
+    }
+    .switch::after {
+        content: ""; position: absolute; top: 2.5px; left: 3px;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: #fff; transition: left 0.2s ease;
+    }
+    .dr-row.on .switch { background: #e50914; }
+    .dr-row.on .switch::after { left: 19px; }
+
+    /* speed pills */
+    .speed-pills { display: flex; flex-wrap: wrap; gap: 7px; padding: 4px 18px 8px; }
+    .speed-pill {
+        background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.12);
+        color: #e5e5e5; border-radius: 16px; padding: 6px 13px;
+        font-family: 'Inter', sans-serif; font-size: 12.5px; cursor: pointer;
+    }
+    .speed-pill.active { background: #e50914; border-color: #e50914; color: #fff; font-weight: 600; }
+
+    /* adjustment slider rows: icon — slider — value */
+    .adj {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 18px;
+        color: #e5e5e5; font-size: 13.5px; font-family: 'Inter', sans-serif;
+    }
+    .adj > svg { width: 19px; height: 19px; fill: #cfcfe0; flex-shrink: 0; }
+    .adj input[type=range] {
+        flex: 1; -webkit-appearance: none; appearance: none;
+        height: 4px; border-radius: 2px;
+        background: rgba(255,255,255,0.22);
+        outline: none; cursor: pointer;
+    }
+    .adj input[type=range]::-webkit-slider-thumb {
+        -webkit-appearance: none; width: 14px; height: 14px;
+        border-radius: 50%; background: #e50914;
+        box-shadow: 0 0 0 4px rgba(229,9,20,0.2);
+    }
+    .adj input[type=range]::-moz-range-thumb {
+        width: 14px; height: 14px; border-radius: 50%;
+        background: #e50914; border: none;
+    }
+    .adj output {
+        width: 42px; text-align: right; flex-shrink: 0;
+        color: #9a9ab0; font-size: 12px; font-feature-settings: 'tnum';
+    }
+
+    .adj-btns { display: flex; flex-wrap: wrap; gap: 7px; padding: 4px 18px 8px; }
+    .adj-btns button {
+        background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.12);
+        color: #e5e5e5; border-radius: 8px; padding: 8px 13px;
+        font-family: 'Inter', sans-serif; font-size: 12.5px; cursor: pointer;
+    }
+    .adj-btns button.active { background: #e50914; border-color: #e50914; color: #fff; }
+
+    .dr-note {
+        padding: 4px 18px 10px;
+        color: #9a9ab0; font-size: 12px; line-height: 1.5;
+    }
+
+    /* ============ VLC MODAL (inside stage = fullscreen-safe) ============ */
+    .modal-overlay {
+        position: absolute; inset: 0; z-index: 40;
+        background: rgba(0,0,0,0.65);
+        display: none; align-items: center; justify-content: center;
+        padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+        background: #14141f;
+        border: 1px solid rgba(255,255,255,0.12);
+        border-radius: 14px;
+        width: 100%; max-width: 420px;
+        max-height: 85%; overflow-y: auto;
+        padding: 22px; position: relative;
+    }
+    .modal h3 { margin: 0 0 16px; font-size: 17px; color: #fff; }
+    .modal-close {
+        position: absolute; top: 14px; right: 16px;
+        background: none; border: none; color: #cfcfe0;
+        font-size: 18px; cursor: pointer;
+    }
+    #vlcModal .modal ol { padding-left: 20px; margin: 0 0 16px; font-size: 14px; line-height: 1.7; color: #cfcfe0; }
+    .vlc-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .vlc-actions .dr-row { width: auto; padding: 9px 14px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; }
+    .vlc-actions .dr-row.primary { background: #e50914; border-color: #e50914; }
+    #vlcCopyStatus { margin-top: 10px; font-size: 13px; color: #8ee6a8; min-height: 16px; }
+</style>
+</head>
+<body>
+
+<div id="stage">
+    <video id="video" playsinline preload="metadata"></video>
+
+    <div id="spinner" class="hidden"></div>
+    <div id="centerIcon"><svg viewBox="0 0 24 24"><path id="centerPath" d="M8 5v14l11-7z"/></svg></div>
+
+    <div id="titleBar"><span class="accent"></span><span class="name" id="movieName">Loading…</span></div>
+
+    <div id="speedBadge"><svg viewBox="0 0 24 24"><path d="M4 6l8 6-8 6V6zm9 0l8 6-8 6V6z"/></svg>2×</div>
+
+    <div class="edge-slider" id="volEdge">
+        <svg class="edge-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+        <div class="edge-track"><div class="edge-fill" id="volEdgeFill"></div></div>
+        <span class="edge-pct" id="volEdgePct">100</span>
+    </div>
+    <div class="edge-slider" id="briEdge">
+        <svg class="edge-icon" viewBox="0 0 24 24"><path d="M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM12 1v3m0 16v3M1 12h3m16 0h3M4.2 4.2l2.1 2.1m11.4 11.4l2.1 2.1m0-15.6l-2.1 2.1M6.3 17.7l-2.1 2.1"/></svg>
+        <div class="edge-track"><div class="edge-fill" id="briEdgeFill"></div></div>
+        <span class="edge-pct" id="briEdgePct">100</span>
+    </div>
+
+    <div class="seek-fx" id="seekFxL">
+        <div class="seek-ripple"></div>
+        <svg class="seek-ico" viewBox="0 0 24 24"><path d="M11.5 12L20 18V6M11 18V6L2.5 12 11 18z"/></svg>
+        <span class="seek-lbl"></span>
+    </div>
+    <div class="seek-fx" id="seekFxR">
+        <div class="seek-ripple"></div>
+        <svg class="seek-ico" viewBox="0 0 24 24"><path d="M13 6v12l8.5-6L13 6zM4 18l8.5-6L4 6v12z"/></svg>
+        <span class="seek-lbl"></span>
+    </div>
+
+    <div id="controls">
+        <button class="ctl-btn" id="playBtn" aria-label="Play/Pause">
+            <svg id="icoPlay" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icoPause" viewBox="0 0 24 24" style="display:none"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+
+        <input type="range" id="seek" min="0" max="1000" value="0" aria-label="Seek">
+
+        <span id="timeLabel">0:00 / 0:00</span>
+
+        <div id="volWrap">
+            <button class="ctl-btn" id="volBtn" aria-label="Volume">
+                <svg id="icoVol" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+            </button>
+            <div id="volPop">
+                <svg class="vp-icon" id="volPopIcon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+                <div id="volTrack">
+                    <div class="vp-rail">
+                        <div class="vp-fill" id="volFill"></div>
+                        <div class="vp-thumb" id="volThumb"></div>
+                    </div>
+                </div>
+                <div class="vol-pct" id="volPct">100</div>
+            </div>
+        </div>
+
+        <button class="ctl-btn" id="setBtn" aria-label="Settings">
+            <svg viewBox="0 0 24 24"><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.5 7.5 0 0 0-1.7-1L14.5 2.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5L9.2 5a7.5 7.5 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1a7.5 7.5 0 0 0 1.7 1l.3 2.6c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.3-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/></svg>
+        </button>
+    </div>
+
+    <div id="err"></div>
+
+    <!-- ============ SETTINGS DRAWER (inside stage = fullscreen-safe) ============ -->
+    <div id="drawerOverlay"></div>
+    <aside id="settingsDrawer">
+        <div class="dr-head">
+            <h3>Settings</h3>
+            <button class="dr-close" id="drawerClose">✕</button>
+        </div>
+
+        <button class="dr-row" data-expand="secSpeed">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            Playback speed
+            <span class="dr-val" id="speedVal">1×</span>
+            <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <div class="dr-sec" id="secSpeed">
+            <div class="speed-pills" id="speedPills">
+                <button class="speed-pill" data-speed="0.5">0.5×</button>
+                <button class="speed-pill" data-speed="0.75">0.75×</button>
+                <button class="speed-pill active" data-speed="1">1×</button>
+                <button class="speed-pill" data-speed="1.25">1.25×</button>
+                <button class="speed-pill" data-speed="1.5">1.5×</button>
+                <button class="speed-pill" data-speed="2">2×</button>
+            </div>
+        </div>
+
+        <button class="dr-row" id="setLoop">
+            <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z"/></svg>
+            Loop video
+            <span class="switch"></span>
+        </button>
+
+        <button class="dr-row" data-expand="secAudio">
+            <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 0 0-9 9v5a3 3 0 0 0 3 3h2a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1H5v-1a7 7 0 0 1 14 0v1h-3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h2a3 3 0 0 0 3-3v-5a9 9 0 0 0-9-9z"/></svg>
+            Audio track
+            <span class="dr-val" id="audioVal">Auto</span>
+            <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <div class="dr-sec" id="secAudio">
+            <div class="speed-pills" id="audioPills"></div>
+            <div class="dr-note" id="audioNote"></div>
+        </div>
+
+        <button class="dr-row expanded" data-expand="secAdj">
+            <svg viewBox="0 0 24 24"><path d="M3 5h10v2H3zM17 5h4v2h-4zM15 3v6h2V3zM3 11h4v2H3zM11 11h10v2H11zM9 9v6h2V9zM3 17h12v2H3zM19 17h2v2h-2zM17 15v6h2v-6z"/></svg>
+            Video adjustments
+            <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <div class="dr-sec open" id="secAdj">
+            <label class="adj">
+                <svg viewBox="0 0 24 24"><path d="M12 7a5 5 0 1 1 0 10 5 5 0 0 1 0-10zM12 1v3m0 16v3M1 12h3m16 0h3M4.2 4.2l2.1 2.1m11.4 11.4l2.1 2.1m0-15.6l-2.1 2.1M6.3 17.7l-2.1 2.1"/></svg>
+                <span>Brightness</span>
+                <input type="range" id="fBri" min="30" max="200" value="100">
+                <output id="oBri">100%</output>
+            </label>
+            <label class="adj">
+                <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z"/></svg>
+                <span>Contrast</span>
+                <input type="range" id="fCon" min="30" max="200" value="100">
+                <output id="oCon">100%</output>
+            </label>
+            <label class="adj">
+                <svg viewBox="0 0 24 24"><path d="M12 2s6.5 7.6 6.5 12a6.5 6.5 0 1 1-13 0C5.5 9.6 12 2 12 2z"/></svg>
+                <span>Saturation</span>
+                <input type="range" id="fSat" min="0" max="250" value="100">
+                <output id="oSat">100%</output>
+            </label>
+            <label class="adj">
+                <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm0 4a5 5 0 1 0 5 5h-2a3 3 0 1 1-3-3V7z"/></svg>
+                <span>Hue</span>
+                <input type="range" id="fHue" min="0" max="360" value="0">
+                <output id="oHue">0°</output>
+            </label>
+            <div class="adj-btns">
+                <button id="bAdjReset" style="flex:1">⟲ Reset adjustments</button>
+            </div>
+        </div>
+
+        <button class="dr-row" data-expand="secOther">
+            <svg viewBox="0 0 24 24"><path d="M6 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm6 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm6 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4z"/></svg>
+            Other
+            <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <div class="dr-sec" id="secOther">
+            <a class="dr-row" id="setDownload" download>
+                <svg viewBox="0 0 24 24"><path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v2H5v-2z"/></svg>
+                Download file
+            </a>
+            <button class="dr-row" id="setVLC">
+                <svg viewBox="0 0 24 24"><path d="M12 3L2 20h20L12 3zm0 5.5L18.5 18h-13L12 8.5z"/></svg>
+                Open in VLC
+            </button>
+            <button class="dr-row" id="setDirect">
+                <svg viewBox="0 0 24 24"><path d="M10.6 13.4a1 1 0 0 0 1.4 1.4l4-4a3.5 3.5 0 0 0-5-5L8.6 8.2a1 1 0 1 0 1.4 1.4l2.4-2.4a1.5 1.5 0 0 1 2.2 2.2l-4 4zm2.8-2.8a1 1 0 0 0-1.4-1.4l-4 4a3.5 3.5 0 0 0 5 5l2.4-2.4a1 1 0 0 0-1.4-1.4l-2.4 2.4a1.5 1.5 0 0 1-2.2-2.2l4-4z"/></svg>
+                <span id="setDirectLbl">Copy direct link</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- ============ VLC MODAL (inside stage = fullscreen-safe) ============ -->
+    <div class="modal-overlay" id="vlcModal">
+        <div class="modal">
+            <button class="modal-close" data-close="vlcModal">✕</button>
+            <h3>Open in VLC</h3>
+            <ol id="vlcSteps"></ol>
+            <div class="vlc-actions">
+                <button class="dr-row primary" id="vlcLaunch">Launch VLC</button>
+                <button class="dr-row" id="vlcCopy">Copy link</button>
+                <a class="dr-row" id="vlcInstall" href="#" target="_blank" rel="noopener"></a>
+            </div>
+            <div id="vlcCopyStatus"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const DEV_STREAM_URL = 'https://f2l.harisgarage.workers.dev/stream/1904?hash=6086d183e1805fd55878119458cfc226';
+const streamUrl = new URLSearchParams(location.search).get('video') || DEV_STREAM_URL;
+
+const $ = id => document.getElementById(id);
+const stage = $('stage'), video = $('video'), spinner = $('spinner'), centerIcon = $('centerIcon'), centerPath = $('centerPath');
+const playBtn = $('playBtn'), icoPlay = $('icoPlay'), icoPause = $('icoPause');
+const seek = $('seek'), volWrap = $('volWrap'), volBtn = $('volBtn'), volPct = $('volPct');
+const volTrack = $('volTrack'), volFill = $('volFill'), volThumb = $('volThumb'), volPopIcon = $('volPopIcon');
+const setBtn = $('setBtn'), errBox = $('err'), movieName = $('movieName');
+const speedBadge = $('speedBadge');
+const volEdge = $('volEdge'), volEdgeFill = $('volEdgeFill'), volEdgePct = $('volEdgePct');
+const briEdge = $('briEdge'), briEdgeFill = $('briEdgeFill'), briEdgePct = $('briEdgePct');
+const seekFxL = $('seekFxL'), seekFxR = $('seekFxR');
+
+video.src = streamUrl;
+video.load();
+
+/* ================= TITLE from Content-Disposition ================= */
+(async () => {
+    let name = 'STREAM';
+    try {
+        const res = await fetch(streamUrl, { method: 'HEAD' });
+        const m = (res.headers.get('Content-Disposition') || '').match(/filename="?([^";]+)"?/i);
+        if (m) {
+            name = m[1].replace(/\.(mkv|mp4|avi|webm)$/i, '').replace(/[\._]/g, ' ')
+                .replace(/\s*(S\d+.*|\[.*|\d{3,4}p.*)$/i, '')
+                .replace(/\(\s*(\d{4})\s*\)/, '· $1').trim();
+        }
+    } catch (e) {}
+    movieName.textContent = name || 'STREAM';
+})();
+
+/* ================= FULLSCREEN — always-on intent =================
+   Browsers require a user gesture for fullscreen, so we can't force it at
+   load. Instead: every user gesture re-attempts fullscreen until it sticks,
+   and if the user exits (Esc / swipe-down) the very next touch re-enters.
+   Landscape lock fires whenever fullscreen engages (Android Chrome).
+   iOS Safari: orientation.lock doesn't exist — falls back to native video
+   fullscreen which is already landscape-friendly. */
+function lockLandscape() {
+    try {
+        if (screen.orientation && screen.orientation.lock)
+            screen.orientation.lock('landscape').catch(() => {});
+    } catch (e) {}
+}
+function goFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) return;
+    try {
+        if (stage.requestFullscreen) {
+            stage.requestFullscreen().then(lockLandscape).catch(() => {
+                if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
+            });
+        } else if (stage.webkitRequestFullscreen) {
+            stage.webkitRequestFullscreen();
+        } else if (video.webkitEnterFullscreen) {
+            video.webkitEnterFullscreen();
+        }
+    } catch (e) {}
+}
+document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) lockLandscape();
+    /* if user exited fullscreen, landscape lock auto-releases — nothing to do */
+});
+document.addEventListener('webkitfullscreenchange', () => {
+    if (document.webkitFullscreenElement) lockLandscape();
+});
+/* try every activation-capable signal — first one that the browser accepts
+   wins; the rest no-op because goFullscreen() early-returns when already
+   fullscreen. Page-load attempt too: always fails in normal browsers but
+   costs nothing and can succeed in embedded/webview contexts. */
+goFullscreen();
+['keydown', 'wheel', 'touchstart'].forEach(ev =>
+    window.addEventListener(ev, goFullscreen, { capture: true, passive: true }));
+
+/* ================= VIDEO FX STATE (gesture brightness + modal share this) ================= */
+const fx = { bri: 100, con: 100, sat: 100, hue: 0 };
+function applyFx() {
+    video.style.filter = `brightness(${fx.bri}%) contrast(${fx.con}%) saturate(${fx.sat}%) hue-rotate(${fx.hue}deg)`;
+    $('fBri').value = fx.bri; $('oBri').textContent = fx.bri + '%';
+    $('fCon').value = fx.con; $('oCon').textContent = fx.con + '%';
+    $('fSat').value = fx.sat; $('oSat').textContent = fx.sat + '%';
+    $('fHue').value = fx.hue; $('oHue').textContent = fx.hue + '°';
+}
+$('fBri').addEventListener('input', e => { fx.bri = +e.target.value; applyFx(); });
+$('fCon').addEventListener('input', e => { fx.con = +e.target.value; applyFx(); });
+$('fSat').addEventListener('input', e => { fx.sat = +e.target.value; applyFx(); });
+$('fHue').addEventListener('input', e => { fx.hue = +e.target.value; applyFx(); });
+$('bAdjReset').addEventListener('click', () => {
+    Object.assign(fx, { bri: 100, con: 100, sat: 100, hue: 0 });
+    applyFx();
+});
+
+/* ================= PLAY / PAUSE ================= */
+const D_PLAY = 'M8 5v14l11-7z', D_PAUSE = 'M6 5h4v14H6zM14 5h4v14h-4z';
+let centerTimer = null;
+/* sticky=true → icon stays (paused state). sticky=false → flash then fade.
+   after() → runs after the flash completes (e.g. settle into sticky play). */
+function showCenter(path, sticky, after) {
+    centerPath.setAttribute('d', path);
+    centerIcon.classList.remove('on');
+    void centerIcon.offsetWidth;            /* restart the fade-in cleanly */
+    centerIcon.classList.add('on');
+    clearTimeout(centerTimer);
+    if (!sticky) {
+        centerTimer = setTimeout(() => {
+            centerIcon.classList.remove('on');
+            if (after) setTimeout(after, 200);   /* let the fade finish first */
+        }, 550);
+    }
+}
+function setPlayIcon() {
+    const playing = !video.paused && !video.ended;
+    icoPlay.style.display = playing ? 'none' : 'block';
+    icoPause.style.display = playing ? 'block' : 'none';
+}
+function togglePlay() {
+    goFullscreen();
+    video.paused || video.ended ? video.play().catch(() => {}) : video.pause();
+}
+playBtn.addEventListener('click', togglePlay);
+video.addEventListener('play', () => {
+    setPlayIcon();
+    showCenter(D_PLAY, false);              /* flash play → fade out */
+});
+video.addEventListener('pause', () => {
+    setPlayIcon();
+    /* brief pause glyph acknowledges the click, then sticky play icon */
+    showCenter(D_PAUSE, false, () => { if (video.paused || video.ended) showCenter(D_PLAY, true); });
+});
+video.addEventListener('ended', () => { setPlayIcon(); showCenter(D_PLAY, true); });
+
+/* ================= SEEK SLIDER ================= */
+function paintSeek() {
+    const pct = (seek.value / seek.max) * 100;
+    seek.style.background = `linear-gradient(to right,#e50914 0%,#e50914 ${pct}%,rgba(255,255,255,0.9) ${pct}%,rgba(255,255,255,0.9) 100%)`;
+}
+let scrubbing = false;
+seek.addEventListener('input', () => { scrubbing = true; paintSeek(); });
+seek.addEventListener('change', () => {
+    if (video.duration) video.currentTime = (seek.value / seek.max) * video.duration;
+    scrubbing = false;
+});
+function fmtTime(t) {
+    if (!isFinite(t) || t < 0) t = 0;
+    t = Math.floor(t);
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    const mm = String(m).padStart(h ? 2 : 1, '0');
+    return (h ? h + ':' : '') + mm + ':' + String(s).padStart(2, '0');
+}
+function updateTimeLabel() {
+    $('timeLabel').textContent = fmtTime(video.currentTime) + ' / ' + fmtTime(video.duration);
+}
+video.addEventListener('durationchange', updateTimeLabel);
+video.addEventListener('loadedmetadata', updateTimeLabel);
+video.addEventListener('timeupdate', () => {
+    updateTimeLabel();
+    if (!scrubbing && video.duration) {
+        seek.value = Math.round(video.currentTime / video.duration * seek.max);
+        paintSeek();
+    }
+});
+/* show the position you're scrubbing TO while dragging */
+seek.addEventListener('input', () => {
+    if (video.duration)
+        $('timeLabel').textContent = fmtTime(seek.value / seek.max * video.duration) + ' / ' + fmtTime(video.duration);
+});
+
+/* ================= VOLUME ================= */
+const ICON_MUTE = 'M3 9v6h4l5 5V4L7 9H3zm14.6 3l2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4-2.7-2.7z';
+const ICON_LOW  = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z';
+const ICON_FULL = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z';
+function setVolume(pct) {                     /* pct 0-100, single source of truth */
+    pct = Math.max(0, Math.min(100, Math.round(pct)));
+    video.volume = pct / 100;
+    video.muted = pct === 0;
+    volFill.style.height = pct + '%';
+    volThumb.style.bottom = pct + '%';
+    volPct.textContent = pct;
+    const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
+    $('icoVol').innerHTML = `<path d="${p}"/>`;
+    volPopIcon.innerHTML = `<path d="${p}"/>`;
+}
+volBtn.addEventListener('click', e => { e.stopPropagation(); volWrap.classList.toggle('open'); });
+/* capsule track: click or drag sets volume (pointer capture keeps the
+   drag alive if the finger strays off the thin rail) */
+function volFromEvent(e) {
+    const r = volTrack.getBoundingClientRect();
+    return Math.max(0, Math.min(100, (1 - (e.clientY - r.top) / r.height) * 100));
+}
+volTrack.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    volTrack.setPointerCapture(e.pointerId);
+    setVolume(volFromEvent(e));
+});
+volTrack.addEventListener('pointermove', e => { if (e.buttons) setVolume(volFromEvent(e)); });
+document.addEventListener('click', e => { if (!volWrap.contains(e.target)) volWrap.classList.remove('open'); });
+setVolume(100);
+
+/* ================= SETTINGS DRAWER ================= */
+function openModal(id) { $(id).classList.add('open'); }
+function closeModal(id) { $(id).classList.remove('open'); }
+const settingsDrawer = $('settingsDrawer'), drawerOverlay = $('drawerOverlay');
+function openDrawer() {
+    settingsDrawer.classList.add('open');
+    drawerOverlay.classList.add('open');
+    wakeUI();
+}
+function closeDrawer() {
+    settingsDrawer.classList.remove('open');
+    drawerOverlay.classList.remove('open');
+}
+setBtn.addEventListener('click', e => { e.stopPropagation(); openDrawer(); });
+$('drawerClose').addEventListener('click', closeDrawer);
+drawerOverlay.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeDrawer(); closeModal('vlcModal'); }
+});
+document.querySelectorAll('.modal-close').forEach(b =>
+    b.addEventListener('click', () => closeModal(b.dataset.close)));
+document.querySelectorAll('.modal-overlay').forEach(o =>
+    o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
+
+/* expandable sections */
+document.querySelectorAll('[data-expand]').forEach(row =>
+    row.addEventListener('click', () => {
+        const sec = $(row.dataset.expand);
+        const open = sec.classList.toggle('open');
+        row.classList.toggle('expanded', open);
+    }));
+
+/* external links */
+const dUrl = streamUrl.includes('?') ? streamUrl + '&d=true' : streamUrl + '?d=true';
+$('setDownload').href = dUrl;
+/* copy the stream URL to clipboard, brief "Copied ✓" confirmation */
+$('setDirect').addEventListener('click', () => {
+    const lbl = $('setDirectLbl');
+    const ok = () => { lbl.textContent = 'Copied ✓'; setTimeout(() => lbl.textContent = 'Copy direct link', 1600); };
+    navigator.clipboard.writeText(streamUrl).then(ok, () => {
+        /* clipboard API can fail on non-HTTPS/older webviews — execCommand fallback */
+        const ta = document.createElement('textarea');
+        ta.value = streamUrl; ta.style.cssText = 'position:fixed;opacity:0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); ok(); }
+        catch { lbl.textContent = 'Copy failed'; setTimeout(() => lbl.textContent = 'Copy direct link', 1600); }
+        ta.remove();
+    });
+});
+
+/* loop — toggle switch */
+$('setLoop').addEventListener('click', () => {
+    video.loop = !video.loop;
+    $('setLoop').classList.toggle('on', video.loop);
+});
+
+/* speed pills */
+let normalSpeed = 1;
+document.querySelectorAll('.speed-pill').forEach(p => p.addEventListener('click', () => {
+    normalSpeed = parseFloat(p.dataset.speed);
+    video.playbackRate = normalSpeed;
+    $('speedVal').textContent = p.dataset.speed + '×';
+    document.querySelectorAll('.speed-pill').forEach(x => x.classList.toggle('active', x === p));
+}));
+
+/* audio tracks — real switching where the browser exposes audioTracks
+   (Safari/HLS); for embedded MKV tracks browsers can't switch, so show
+   what's inside and point to VLC. */
+function setupAudioTracks() {
+    const pills = $('audioPills'), note = $('audioNote'), val = $('audioVal');
+    const at = video.audioTracks;
+    if (at && at.length > 1) {
+        Array.from(at).forEach((t, i) => {
+            const b = document.createElement('button');
+            b.className = 'speed-pill' + (t.enabled ? ' active' : '');
+            b.textContent = t.label || (t.language ? t.language.toUpperCase() : 'Track ' + (i + 1));
+            b.addEventListener('click', () => {
+                Array.from(at).forEach((x, j) => x.enabled = j === i);
+                Array.from(pills.children).forEach((x, j) => x.classList.toggle('active', j === i));
+                val.textContent = b.textContent;
+            });
+            pills.appendChild(b);
+        });
+        val.textContent = 'Multi';
+    } else {
+        /* our stream contract: dual audio Hindi+English always present */
+        note.textContent = 'This file contains Hindi + English audio. Browsers can\'t switch embedded MKV audio tracks — open in VLC to switch.';
+        val.textContent = '2 tracks';
+    }
+}
+video.addEventListener('loadedmetadata', setupAudioTracks);
+
+/* ================= VLC MODAL (ported from v1) ================= */
+function detectPlatform() {
+    const ua = navigator.userAgent || '';
+    if (/android/i.test(ua)) return 'android';
+    if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+    return 'desktop';
+}
+function buildVlcHref(url, platform) {
+    if (platform === 'android') {
+        const scheme = url.startsWith('https') ? 'https' : 'http';
+        const bare = url.replace(/^https?:\/\//, '');
+        const fb = encodeURIComponent('https://play.google.com/store/apps/details?id=org.videolan.vlc');
+        return `intent://${bare}#Intent;scheme=${scheme};package=org.videolan.vlc;S.browser_fallback_url=${fb};end`;
+    }
+    if (platform === 'ios') return 'vlc://' + url;
+    return '';
+}
+$('setVLC').addEventListener('click', () => {
+    closeDrawer();
+    const platform = detectPlatform();
+    const steps = platform === 'android' ? [
+        'Tap <strong>Launch VLC</strong> — opens the stream in the VLC app.',
+        'No response? Install via <strong>Get VLC</strong> then retry.',
+        'Manual: <strong>Copy link</strong> → VLC → Network → paste → Play.'
+    ] : platform === 'ios' ? [
+        'Tap <strong>Launch VLC</strong> — opens the stream in the VLC app.',
+        'No response? Install via <strong>Get VLC</strong> then retry.',
+        'Manual: <strong>Copy link</strong> → VLC → + → Network → paste → Open.'
+    ] : [
+        'Click <strong>Copy link</strong>.',
+        'Open <strong>VLC Media Player</strong>.',
+        '<strong>Media → Open Network Stream</strong> (Ctrl/Cmd+N).',
+        'Paste → <strong>Play</strong>.'
+    ];
+    $('vlcSteps').innerHTML = steps.map(s => `<li>${s}</li>`).join('');
+    const inst = $('vlcInstall');
+    if (platform === 'android') { inst.href = 'https://play.google.com/store/apps/details?id=org.videolan.vlc'; inst.textContent = 'Get VLC (Play Store)'; }
+    else if (platform === 'ios') { inst.href = 'https://apps.apple.com/app/vlc-media-player/id650377962'; inst.textContent = 'Get VLC (App Store)'; }
+    else { inst.href = 'https://www.videolan.org/vlc/'; inst.textContent = 'Get VLC (Desktop)'; }
+    const href = buildVlcHref(streamUrl, platform);
+    $('vlcLaunch').style.display = href ? 'inline-flex' : 'none';
+    $('vlcLaunch').onclick = () => { if (href) location.href = href; };
+    $('vlcCopy').onclick = () => navigator.clipboard.writeText(streamUrl)
+        .then(() => $('vlcCopyStatus').textContent = 'Link copied!')
+        .catch(() => $('vlcCopyStatus').textContent = 'Copy failed — use Direct link.');
+    openModal('vlcModal');
+});
+
+/* ================= MX PLAYER-STYLE GESTURES =================
+   pointer events cover touch + mouse.
+   - hold ≥350ms            → 2× speed until release
+   - vertical swipe LEFT    → volume
+   - vertical swipe RIGHT   → brightness
+   - double-tap left/right  → −10s / +10s
+   - single tap             → toggle UI                                */
+
+const HOLD_MS = 350, TAP_MS = 300, SWIPE_THRESH = 24;
+
+let g = null;          /* active gesture state */
+let lastTap = 0, tapTimer = null;
+let holding = false;
+
+function inControls(e) {
+    return e.target.closest('#controls, #volPop, .modal-overlay, #settingsDrawer, #drawerOverlay');
+}
+/* VLC-style edge HUD: volume slider on left edge, brightness on right.
+   Fill is measured bottom-up like VLC's vertical bars. */
+function showVolHud(pct) {
+    volEdgeFill.style.height = pct + '%';
+    volEdgePct.textContent = Math.round(pct);
+    volEdge.classList.add('show');
+}
+function showBriHud(pct) {
+    /* pct arrives as 30–200 (fx.bri) → normalize to 0–100 for the bar */
+    const n = Math.max(0, Math.min(100, (pct - 30) / 170 * 100));
+    briEdgeFill.style.height = n + '%';
+    briEdgePct.textContent = Math.round(pct);
+    briEdge.classList.add('show');
+}
+function hideHud() {
+    volEdge.classList.remove('show');
+    briEdge.classList.remove('show');
+}
+/* YouTube-style seek feedback: ripple at tap point + accumulating
+   seconds label. Repeats on the same side accumulate the displayed
+   total (tap-tap-tap = −10 → −20 → −30) and restart the ripple without
+   the container flickering. */
+const seekFxState = {
+    L: { total: 0, timer: null },
+    R: { total: 0, timer: null }
+};
+function applySeek(delta) {                       /* clamped + UI synced */
+    video.currentTime = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + delta));
+    /* 'seeked'/'timeupdate' will also fire, but update immediately so the
+       slider + time label never lag a frame behind */
+    if (video.duration) {
+        seek.value = Math.round(video.currentTime / video.duration * seek.max);
+        paintSeek();
+        updateTimeLabel();
+    }
+}
+function seekFx(side, x, y) {
+    const st = seekFxState[side];
+    const fx = side === 'L' ? seekFxL : seekFxR;
+    const delta = side === 'L' ? -10 : 10;
+
+    applySeek(delta);
+    st.total += 10;
+
+    fx.style.left = x + 'px';
+    fx.style.top = y + 'px';
+    fx.querySelector('.seek-lbl').textContent = (side === 'L' ? '−' : '+') + st.total + ' seconds';
+
+    /* restart ripple cleanly: reset animation, keep container visible */
+    fx.classList.remove('show');
+    void fx.offsetWidth;
+    fx.classList.add('show');
+
+    clearTimeout(st.timer);
+    st.timer = setTimeout(() => {
+        st.total = 0;
+        fx.classList.remove('show');
+    }, 700);
+}
+function wakeUI() {
+    stage.classList.remove('hide-ui');
+    clearTimeout(wakeUI.t);
+    if (!video.paused) wakeUI.t = setTimeout(() => {
+        stage.classList.add('hide-ui'); volWrap.classList.remove('open');
+    }, 2800);
+}
+video.addEventListener('play', wakeUI);
+video.addEventListener('pause', () => { stage.classList.remove('hide-ui'); clearTimeout(wakeUI.t); });
+
+stage.addEventListener('pointerdown', e => {
+    if (inControls(e)) return;
+    goFullscreen();
+    g = {
+        x0: e.clientX, y0: e.clientY, t0: Date.now(),
+        mode: null,                    /* null | 'vol' | 'bri' */
+        side: e.clientX < innerWidth / 2 ? 'L' : 'R',
+        startVol: video.volume * 100,
+        startBri: fx.bri,
+        moved: false
+    };
+    g.holdTimer = setTimeout(() => {
+        if (g && !g.moved && !g.mode) {
+            holding = true;
+            if (video.paused || video.ended) {
+                video.play().catch(() => {});    /* hold → play */
+            } else {
+                g.boosted = true;                /* hold while playing → 2× */
+                video.playbackRate = 2;
+                speedBadge.classList.add('show');
+            }
+        }
+    }, HOLD_MS);
+});
+
+stage.addEventListener('pointermove', e => {
+    if (!g) return;
+    const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    if (!g.mode && Math.abs(dy) > SWIPE_THRESH && Math.abs(dy) > Math.abs(dx) * 1.4) {
+        g.mode = g.side === 'L' ? 'vol' : 'bri'; /* MX layout per spec */
+        clearTimeout(g.holdTimer);
+        g.moved = true;
+    }
+    if (g.mode === 'vol') {
+        const delta = -(dy / innerHeight) * 100; /* up = louder */
+        const v = Math.max(0, Math.min(100, g.startVol + delta));
+        setVolume(v);
+        showVolHud(v);
+    } else if (g.mode === 'bri') {
+        const delta = -(dy / innerHeight) * 170; /* 30–200% range */
+        fx.bri = Math.max(30, Math.min(200, Math.round(g.startBri + delta)));
+        applyFx();
+        showBriHud(fx.bri);
+    }
+});
+
+function endGesture(e) {
+    if (!g) return;
+    clearTimeout(g.holdTimer);
+
+    if (holding) {                               /* release from hold */
+        holding = false;
+        if (g.boosted) {                         /* was a 2× hold — restore */
+            g.boosted = false;
+            video.playbackRate = normalSpeed;
+            speedBadge.classList.remove('show');
+        }
+        /* hold-from-paused keeps playing after release */
+    }
+    if (g.mode) { hideHud(); g = null; return; }
+
+    const dt = Date.now() - g.t0;
+    const movedFar = Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 12;
+    if (!movedFar && dt < HOLD_MS) {             /* tap / double-tap */
+        const now = Date.now();
+        if (now - lastTap < TAP_MS) {
+            /* every tap within the window while a tap-chain is running
+               seeks again — tap storms accumulate: ±10s each */
+            clearTimeout(tapTimer); tapTimer = null;
+            lastTap = now;
+            seekFx(g.side, e.clientX, e.clientY);
+        } else {
+            lastTap = now;
+            tapTimer = setTimeout(() => {        /* single tap → play/pause */
+                tapTimer = null;
+                wakeUI();
+                togglePlay();
+            }, TAP_MS);
+        }
+    }
+    g = null;
+}
+stage.addEventListener('pointerup', endGesture);
+stage.addEventListener('pointercancel', () => { if (g) { clearTimeout(g.holdTimer); if (holding) { holding = false; if (g.boosted) { video.playbackRate = normalSpeed; speedBadge.classList.remove('show'); } } hideHud(); g = null; } });
+
+/* ================= KEYBOARD =================
+   Space press  → play/pause toggle
+   Space hold   → play (paused) or 2× boost (playing), release restores */
+let spaceHeld = false, spaceTimer = null;
+document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    if (e.code === 'Space') {
+        e.preventDefault();
+        if (e.repeat) return;
+        spaceTimer = setTimeout(() => {
+            spaceHeld = true;
+            if (video.paused || video.ended) {
+                video.play().catch(() => {});
+            } else {
+                video.playbackRate = 2;
+                speedBadge.classList.add('show');
+            }
+        }, HOLD_MS);
+    }
+    else if (e.code === 'ArrowLeft')  applySeek(-10);
+    else if (e.code === 'ArrowRight') applySeek(10);
+    else if (e.code === 'ArrowUp')    { e.preventDefault(); setVolume(video.volume * 100 + 5); }
+    else if (e.code === 'ArrowDown')  { e.preventDefault(); setVolume(video.volume * 100 - 5); }
+    else if (e.code === 'KeyF')       { document.fullscreenElement ? document.exitFullscreen() : goFullscreen(); }
+    else if (e.code === 'KeyM')       setVolume(video.muted || video.volume === 0 ? 100 : 0);
+    wakeUI();
+});
+document.addEventListener('keyup', e => {
+    if (e.code !== 'Space') return;
+    clearTimeout(spaceTimer);
+    if (spaceHeld) {
+        spaceHeld = false;
+        if (video.playbackRate === 2) {
+            video.playbackRate = normalSpeed;
+            speedBadge.classList.remove('show');
+        }
+    } else {
+        togglePlay();                          /* quick press → toggle */
+    }
+});
+
+/* ================= SPINNER / ERRORS / RESUME ================= */
+/* spinner only during buffering AFTER playback has begun — on the initial
+   screen the charcoal play button owns the center, no spinner on top of it */
+let hasPlayed = false;
+video.addEventListener('play', () => { hasPlayed = true; });
+video.addEventListener('waiting',   () => { if (hasPlayed) spinner.classList.remove('hidden'); });
+video.addEventListener('playing',   () => spinner.classList.add('hidden'));
+video.addEventListener('canplay',   () => spinner.classList.add('hidden'));
+video.addEventListener('loadstart', () => { if (hasPlayed) spinner.classList.remove('hidden'); });
+video.addEventListener('error', () => {
+    spinner.classList.add('hidden');
+    const m = { 2: 'Network error loading stream.',
+        3: 'Decode failed — codec unsupported by this browser.',
+        4: 'Format not supported (MKV plays in Chrome/Edge — Safari needs VLC).' };
+    errBox.textContent = m[video.error && video.error.code] || 'Unable to play this stream.';
+    errBox.style.display = 'block';
+});
+
+const RK = 'streamResume:' + streamUrl;
+video.addEventListener('loadedmetadata', () => {
+    try {
+        const t = parseFloat(localStorage.getItem(RK) || 0);
+        if (t > 5 && t < video.duration - 3) video.currentTime = t;
+    } catch (e) {}
+});
+setInterval(() => {
+    if (video.currentTime > 5 && !video.paused)
+        try { localStorage.setItem(RK, String(video.currentTime)); } catch (e) {}
+}, 5000);
+
+setPlayIcon();
+if (video.paused) showCenter(D_PLAY, true);   /* initial paused state */
+paintSeek();
+wakeUI();
+</script>
+</body>
+</html>
