@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stick Figure Push-up Loader</title>
+<style>
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; display: grid; place-items: center; background: #080808; }
+.loader { width: 260px; max-width: 90vw; }
+svg { width: 100%; height: auto; overflow: visible; }
+.line { fill: none; stroke: #e50914; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.ground { stroke: #333; stroke-width: 2; stroke-linecap: round; }
+</style>
+</head>
+<body>
+<div class="loader" role="status" aria-label="Loading">
+  <svg viewBox="0 0 160 110" aria-hidden="true">
+    <line class="ground" x1="10" y1="94" x2="150" y2="94"/>
+    <g class="line">
+      <!-- Head -->
+      <circle r="9" cx="27.8" cy="51.2">
+        <animate attributeName="cx" values="27.8;21.6;27.8" keyTimes="0;0.5;1" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
+        <animate attributeName="cy" values="55.2;82;55.2" keyTimes="0;0.5;1" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
+      </circle>
+      <!-- Body: shoulder to toes -->
+      <path d="M41 60 L135 94">
+        <animate attributeName="d" values="M41 60 L135 94;M35.5 83.5 L135 94;M41 60 L135 94" keyTimes="0;0.5;1" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
+      </path>
+      <!-- Arm: shoulder, elbow, hand -->
+      <path d="M41 60 L40.5 77 L40 94">
+        <animate attributeName="d" values="M41 60 L40.5 77 L40 94;M35.5 83.5 L53 83 L40 94;M41 60 L40.5 77 L40 94" keyTimes="0;0.5;1" dur="1.6s" repeatCount="indefinite" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1"/>
+      </path>
+    </g>
+  </svg>
+</div>
+</body>
+</html>
