@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stick Figure Pull-up Loader</title>
+<style>
+:root {
+  --loader-size: 120px;       /* change this to scale the loader */
+  --loader-color: #e50914;
+  --bar-color: #8a8a8a;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body { margin: 0; display: grid; place-items: center; background: #080808; }
+
+.loader {
+  width: var(--loader-size);
+  aspect-ratio: 120 / 140;
+  pointer-events: none;
+  /* keeps the figure visible over bright video frames */
+  filter: drop-shadow(0 1px 4px rgba(0,0,0,.6));
+}
+svg { width: 100%; height: 100%; overflow: visible; display: block; }
+
+.line { fill: none; stroke: var(--loader-color); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.bar  { fill: none; stroke: var(--bar-color); stroke-width: 4; stroke-linecap: round; }
+</style>
+</head>
+<body>
+<div class="loader" role="status" aria-label="Loading">
+  <svg viewBox="0 0 120 140" aria-hidden="true">
+    <!-- Pull-up bar -->
+    <line class="bar" x1="16" y1="24" x2="104" y2="24"/>
+
+    <g class="line">
+      <!-- Arms: hand (on bar) > elbow > shoulder. Straight when hanging, bent when pulled up -->
+      <path d="M38 24 L45 41 L52 58">
+        <animate attributeName="d" dur="2s" repeatCount="indefinite" calcMode="spline"
+          keyTimes="0;0.45;0.6;1" keySplines="0.45 0 0.55 1;0 0 1 1;0.45 0 0.55 1"
+          values="M38 24 L45 41 L52 58;M38 24 L33 40 L52 34;M38 24 L33 40 L52 34;M38 24 L45 41 L52 58"/>
+      </path>
+      <path d="M82 24 L75 41 L68 58">
+        <animate attributeName="d" dur="2s" repeatCount="indefinite" calcMode="spline"
+          keyTimes="0;0.45;0.6;1" keySplines="0.45 0 0.55 1;0 0 1 1;0.45 0 0.55 1"
+          values="M82 24 L75 41 L68 58;M82 24 L87 40 L68 34;M82 24 L87 40 L68 34;M82 24 L75 41 L68 58"/>
+      </path>
+
+      <!-- Body (head, shoulders, torso, legs) moves up and down as one piece -->
+      <g>
+        <animateTransform attributeName="transform" type="translate" dur="2s" repeatCount="indefinite"
+          calcMode="spline" keyTimes="0;0.45;0.6;1" keySplines="0.45 0 0.55 1;0 0 1 1;0.45 0 0.55 1"
+          values="0 0;0 -24;0 -24;0 0"/>
+        <circle cx="60" cy="43" r="8"/>
+        <path d="M52 58 L68 58"/>
+        <path d="M60 58 L60 94"/>
+        <path d="M60 94 L55 124"/>
+        <path d="M60 94 L65 124"/>
+      </g>
+    </g>
+  </svg>
+</div>
+</body>
+</html>
