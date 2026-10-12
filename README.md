@@ -5,7 +5,7 @@
 > A high-performance, zero-dependency streaming web player with gesture controls, VLC-style edge HUDs, hardware video acceleration, and Cloudflare Workers proxy support.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Cloudflare_Workers-F38020?style=for-the-badge&logo=cloudflare)](https://stream.harisgarage.workers.dev)
-[![GitHub Branch](https://img.shields.io/badge/Branch-hari-181717?style=for-the-badge&logo=github)](https://github.com/Link-To-Play/Link_To_Play/tree/hari)
+[![Default Branch](https://img.shields.io/badge/Default_Branch-hari-181717?style=for-the-badge&logo=github)](https://github.com/Link-To-Play/Link_To_Play)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 
 <br/>
