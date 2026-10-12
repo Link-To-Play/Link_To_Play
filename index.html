@@ -237,18 +237,23 @@
     .edge-slider {
         position: absolute;
         top: 50%;
-        transform: translateY(-50%);
+        transform: translateY(-50%) scale(0.95);
         z-index: 25;
-        display: none;
+        opacity: 0;
+        pointer-events: none;
+        display: flex;
         flex-direction: column;
         align-items: center;
         gap: 12px;
         background: rgba(0, 0, 0, 0.45);
         border-radius: 26px;
         padding: 16px 11px;
-        pointer-events: none;
+        transition: opacity 0.22s ease, transform 0.22s ease;
     }
-    .edge-slider.show { display: flex; }
+    .edge-slider.show {
+        opacity: 1;
+        transform: translateY(-50%) scale(1);
+    }
     #volEdge { left: 14px; }
     #briEdge { right: 14px; }
     .edge-icon { width: 22px; height: 22px; flex-shrink: 0; }
@@ -267,6 +272,7 @@
         height: 50%;
         background: #fff;
         border-radius: 3px;
+        transition: height 0.08s ease;
     }
     .edge-pct {
         color: #fff;
@@ -508,7 +514,7 @@
     <div id="speedBadge"><svg viewBox="0 0 24 24"><path d="M4 6l8 6-8 6V6zm9 0l8 6-8 6V6z"/></svg>2×</div>
 
     <div class="edge-slider" id="volEdge">
-        <svg class="edge-icon" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+        <svg class="edge-icon" viewBox="0 0 24 24"><path id="icoVolEdge" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
         <div class="edge-track"><div class="edge-fill" id="volEdgeFill"></div></div>
         <span class="edge-pct" id="volEdgePct">100</span>
     </div>
@@ -848,8 +854,10 @@ seek.addEventListener('input', () => {
 const ICON_MUTE = 'M3 9v6h4l5 5V4L7 9H3zm14.6 3l2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4-2.7-2.7z';
 const ICON_LOW  = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z';
 const ICON_FULL = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z';
+let lastVol = 100;
 function setVolume(pct) {                     /* pct 0-100, single source of truth */
     pct = Math.max(0, Math.min(100, Math.round(pct)));
+    if (pct > 0) lastVol = pct;
     video.volume = pct / 100;
     video.muted = pct === 0;
     volFill.style.height = pct + '%';
@@ -858,6 +866,8 @@ function setVolume(pct) {                     /* pct 0-100, single source of tru
     const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
     $('icoVol').innerHTML = `<path d="${p}"/>`;
     volPopIcon.innerHTML = `<path d="${p}"/>`;
+    const edgeIco = $('icoVolEdge');
+    if (edgeIco) edgeIco.setAttribute('d', p);
 }
 volBtn.addEventListener('click', e => { e.stopPropagation(); volWrap.classList.toggle('open'); });
 /* capsule track: click or drag sets volume (pointer capture keeps the
@@ -1034,10 +1044,16 @@ function inControls(e) {
 }
 /* VLC-style edge HUD: volume slider on left edge, brightness on right.
    Fill is measured bottom-up like VLC's vertical bars. */
+let hudTimer = null;
 function showVolHud(pct) {
     volEdgeFill.style.height = pct + '%';
     volEdgePct.textContent = Math.round(pct);
     volEdge.classList.add('show');
+}
+function triggerVolHud(pct) {
+    showVolHud(pct);
+    clearTimeout(hudTimer);
+    hudTimer = setTimeout(hideHud, 1000);
 }
 function showBriHud(pct) {
     /* pct arrives as 30–200 (fx.bri) → normalize to 0–100 for the bar */
@@ -1047,6 +1063,7 @@ function showBriHud(pct) {
     briEdge.classList.add('show');
 }
 function hideHud() {
+    clearTimeout(hudTimer);
     volEdge.classList.remove('show');
     briEdge.classList.remove('show');
 }
@@ -1205,12 +1222,30 @@ document.addEventListener('keydown', e => {
             }
         }, HOLD_MS);
     }
-    else if (e.code === 'ArrowLeft')  applySeek(-10);
-    else if (e.code === 'ArrowRight') applySeek(10);
-    else if (e.code === 'ArrowUp')    { e.preventDefault(); setVolume(video.volume * 100 + 5); }
-    else if (e.code === 'ArrowDown')  { e.preventDefault(); setVolume(video.volume * 100 - 5); }
-    else if (e.code === 'KeyF')       { document.fullscreenElement ? document.exitFullscreen() : goFullscreen(); }
-    else if (e.code === 'KeyM')       setVolume(video.muted || video.volume === 0 ? 100 : 0);
+    else if (e.code === 'ArrowLeft')  { e.preventDefault(); applySeek(-10); }
+    else if (e.code === 'ArrowRight') { e.preventDefault(); applySeek(10); }
+    else if (e.code === 'ArrowUp') {
+        e.preventDefault();
+        const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+        const next = Math.min(100, current + 5);
+        setVolume(next);
+        triggerVolHud(next);
+    }
+    else if (e.code === 'ArrowDown') {
+        e.preventDefault();
+        const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+        const next = Math.max(0, current - 5);
+        setVolume(next);
+        triggerVolHud(next);
+    }
+    else if (e.code === 'KeyF') {
+        document.fullscreenElement ? document.exitFullscreen() : goFullscreen();
+    }
+    else if (e.code === 'KeyM') {
+        const next = (video.muted || video.volume === 0) ? (lastVol || 100) : 0;
+        setVolume(next);
+        triggerVolHud(next);
+    }
     wakeUI();
 });
 document.addEventListener('keyup', e => {
