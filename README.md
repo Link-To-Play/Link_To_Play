@@ -10,6 +10,7 @@
 
 <br/>
 
+[![Organization](https://img.shields.io/badge/Organization-Link--To--Play-181717?style=flat-square&logo=github)](https://github.com/Link-To-Play)
 [![Original Idea & Architecture](https://img.shields.io/badge/Idea_%26_Architecture-hariharanboss-2563eb?style=flat-square&logo=github)](https://github.com/hariharanboss)
 [![Base Code & Theme](https://img.shields.io/badge/Base_Code_%26_Theme-srikrishnadeveloper-181717?style=flat-square&logo=github)](https://github.com/srikrishnadeveloper)
 
