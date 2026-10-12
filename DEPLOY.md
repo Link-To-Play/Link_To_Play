@@ -15,16 +15,13 @@ That's it — it goes live at `https://hari-player.<your-subdomain>.workers.dev`
 
 To change the name/subdomain, edit `name = "hari-player"` in `wrangler.toml`.
 
-## Change the movie
+## Streaming a movie
 
-Open `index.html`, find this line near the top of the `<script>` block:
+Visit `https://stream.harisgarage.workers.dev` to access the landing screen, where
+you can paste any MKV or MP4 stream URL to play it instantly.
 
-```js
-const DEV_STREAM_URL = 'https://f2l.harisgarage.workers.dev/stream/1904?hash=6086d183e1805fd55878119458cfc226';
-```
-
-Replace with your stream URL. Users can also override it at runtime with
-`?video=<url>` — no redeploy needed for testing.
+Alternatively, provide the URL directly as a query parameter:
+`https://stream.harisgarage.workers.dev/?video=<STREAM_URL>`
 
 ## Files
 
