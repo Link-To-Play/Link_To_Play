@@ -10,6 +10,11 @@
 
 <br/>
 
+[![Base Work & Idea](https://img.shields.io/badge/Idea_%26_Base_Work-srikrishnadeveloper-181717?style=flat-square&logo=github)](https://github.com/srikrishnadeveloper)
+[![Features & Addons](https://img.shields.io/badge/Features_%26_Addons-hariharanboss-2563eb?style=flat-square&logo=github)](https://github.com/hariharanboss)
+
+<br/>
+
 `#video-player` &bull; `#html5-video` &bull; `#streaming` &bull; `#media-player` &bull; `#mkv-player` &bull; `#cloudflare-workers` &bull; `#pwa` &bull; `#gestures` &bull; `#web-audio`
 
 </div>
@@ -165,3 +170,12 @@ To customize the subdomain name, update `name = "stream"` in `wrangler.toml`.
   * **MP4 (H.264 / AAC):** Supported natively across all browsers and devices.
   * **MKV:** Supported natively in Chromium-based browsers (Google Chrome, Microsoft Edge, Brave, Opera). Safari and iOS WebViews require the built-in **"Open in VLC"** button for non-native codecs.
 * **CORS Requirement:** Upstream video streams must include CORS headers (`Access-Control-Allow-Origin: *`). If the stream host blocks CORS, enable **Proxy Stream Mode** in the player drawer.
+
+---
+
+## 👥 Credits & Authors
+
+| Contributor | Role & Contributions |
+| :--- | :--- |
+| **[@srikrishnadeveloper](https://github.com/srikrishnadeveloper)** | **Project Conception & Base Work**<br/>• Conceived the original idea and foundational architecture for the web player.<br/>• Authored the initial core video streaming codebase. |
+| **[@hariharanboss](https://github.com/hariharanboss)** | **Features, Addons & Enhancements**<br/>• Developed the **STREAM PLAYER PRO** landing page and URL input loader.<br/>• Implemented interactive on-screen volume HUDs and keyboard controls.<br/>• Added Aspect Ratio & Screen Fit modes (Fit, Fill/Crop, Stretch, 16:9, 21:9, 4:3).<br/>• Designed custom animated character SVG loaders.<br/>• Built Cloudflare streaming proxy (`worker.js`) and deployment workflows. |
