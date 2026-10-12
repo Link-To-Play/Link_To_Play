@@ -1,4 +1,4 @@
-# 🎬 Stream Player Pro (Hari Player)
+# 🎬 Stream Player Pro
 
 > A high-performance, zero-dependency streaming web player with gesture controls, VLC-style edge HUDs, hardware video acceleration, and Cloudflare Workers proxy support.
 
