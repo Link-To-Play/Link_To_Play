@@ -159,22 +159,39 @@
             font-weight: 700;
             letter-spacing: 0.04em;
             text-transform: uppercase;
-            padding: 4px 8px;
+            padding: 4px 9px;
             border-radius: 6px;
-            background: rgba(229, 9, 20, 0.2);
-            border: 1px solid rgba(229, 9, 20, 0.45);
-            color: #ff7675;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #e5e5ff;
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
             display: none;
             align-items: center;
-            gap: 5px;
+            gap: 6px;
             text-shadow: none;
             flex-shrink: 0;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .title-res-badge:hover,
+        .title-audio-badge:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.28);
         }
 
         .title-res-badge.show {
             display: inline-flex;
+        }
+
+        .title-res-badge .dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #2ecc71;
+            box-shadow: 0 0 6px #2ecc71;
         }
 
         /* ============ BOTTOM CONTROL BAR ============ */
@@ -2886,7 +2903,7 @@
             if (video.videoHeight && video.videoHeight > 0) {
                 const h = video.videoHeight;
                 const label = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
-                resBadge.textContent = label;
+                resBadge.innerHTML = `<span class="dot"></span> ${label}`;
                 resBadge.classList.add('show');
             }
         }
