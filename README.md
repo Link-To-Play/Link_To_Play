@@ -10,8 +10,8 @@
 
 <br/>
 
-[![Base Work & Idea](https://img.shields.io/badge/Idea_%26_Base_Work-srikrishnadeveloper-181717?style=flat-square&logo=github)](https://github.com/srikrishnadeveloper)
-[![Features & Addons](https://img.shields.io/badge/Features_%26_Addons-hariharanboss-2563eb?style=flat-square&logo=github)](https://github.com/hariharanboss)
+[![Original Idea & Architecture](https://img.shields.io/badge/Idea_%26_Architecture-hariharanboss-2563eb?style=flat-square&logo=github)](https://github.com/hariharanboss)
+[![Base Code & Theme](https://img.shields.io/badge/Base_Code_%26_Theme-srikrishnadeveloper-181717?style=flat-square&logo=github)](https://github.com/srikrishnadeveloper)
 
 <br/>
 
@@ -177,5 +177,5 @@ To customize the subdomain name, update `name = "stream"` in `wrangler.toml`.
 
 | Contributor | Role & Contributions |
 | :--- | :--- |
-| **[@srikrishnadeveloper](https://github.com/srikrishnadeveloper)** | **Project Conception & Base Work**<br/>• Conceived the original idea and foundational architecture for the web player.<br/>• Authored the initial core video streaming codebase. |
-| **[@hariharanboss](https://github.com/hariharanboss)** | **Features, Addons & Enhancements**<br/>• Developed the **STREAM PLAYER PRO** landing page and URL input loader.<br/>• Implemented interactive on-screen volume HUDs and keyboard controls.<br/>• Added Aspect Ratio & Screen Fit modes (Fit, Fill/Crop, Stretch, 16:9, 21:9, 4:3).<br/>• Designed custom animated character SVG loaders.<br/>• Built Cloudflare streaming proxy (`worker.js`) and deployment workflows. |
+| **[@hariharanboss](https://github.com/hariharanboss)** | **Original Idea, Architecture & Advanced Features**<br/>• Conceived the original concept and technical architecture of the player.<br/>• Developed the **STREAM PLAYER PRO** landing page and URL input loader.<br/>• Implemented interactive on-screen volume HUDs and keyboard controls.<br/>• Added Aspect Ratio & Screen Fit modes (Fit, Fill/Crop, Stretch, 16:9, 21:9, 4:3).<br/>• Designed custom animated character SVG loaders.<br/>• Built Cloudflare streaming proxy (`worker.js`) and deployment workflows. |
+| **[@srikrishnadeveloper](https://github.com/srikrishnadeveloper)** | **Theme Concept & Base Implementation**<br/>• Conceived the visual theme and design aesthetic of the website.<br/>• Authored the foundational base implementation of the video player. |
