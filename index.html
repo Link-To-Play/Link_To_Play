@@ -48,10 +48,66 @@
             -webkit-user-select: none;
         }
 
+        /* ============ ASPECT RATIO & SCREEN FIT ============ */
         video {
             width: 100%;
             height: 100%;
             object-fit: contain;
+            transition: width 0.15s ease, height 0.15s ease, max-width 0.15s ease, max-height 0.15s ease;
+        }
+
+        #stage.fit-contain video {
+            object-fit: contain;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: auto;
+        }
+
+        #stage.fit-cover video {
+            object-fit: cover;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: auto;
+        }
+
+        #stage.fit-fill video {
+            object-fit: fill;
+            width: 100%;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: auto;
+        }
+
+        #stage.fit-16-9 video {
+            object-fit: fill;
+            width: auto;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 16 / 9;
+        }
+
+        #stage.fit-21-9 video {
+            object-fit: fill;
+            width: 100%;
+            height: auto;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 21 / 9;
+        }
+
+        #stage.fit-4-3 video {
+            object-fit: fill;
+            width: auto;
+            height: 100%;
+            max-width: 100%;
+            max-height: 100%;
+            aspect-ratio: 4 / 3;
         }
 
         /* ============ TOP TITLE BAR ============ */
@@ -858,6 +914,42 @@
             fill: #fff;
         }
 
+        /* Aspect Ratio & Fit Badge top-center toast */
+        #fitBadge {
+            position: absolute;
+            top: 22px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-6px);
+            z-index: 25;
+            background: rgba(10, 10, 15, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
+            padding: 7px 16px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        #fitBadge.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #fitBadge svg {
+            width: 16px;
+            height: 16px;
+            fill: #fff;
+        }
+
         /* ============ SEEK FEEDBACK — YouTube-style ripple ============
        Circular ripple expanding from the tap point + rewind/ff icon +
        accumulating "±N seconds" pill. Repeats restart cleanly. */
@@ -1232,7 +1324,8 @@
             padding: 4px 18px 8px;
         }
 
-        .speed-pill {
+        .speed-pill,
+        .aspect-pill {
             background: rgba(255, 255, 255, 0.09);
             border: 1px solid rgba(255, 255, 255, 0.12);
             color: #e5e5e5;
@@ -1241,9 +1334,11 @@
             font-family: 'Inter', sans-serif;
             font-size: 12.5px;
             cursor: pointer;
+            transition: all 0.15s ease;
         }
 
-        .speed-pill.active {
+        .speed-pill.active,
+        .aspect-pill.active {
             background: #e50914;
             border-color: #e50914;
             color: #fff;
@@ -2009,6 +2104,11 @@
                 <path d="M4 6l8 6-8 6V6zm9 0l8 6-8 6V6z" />
             </svg>2×</div>
 
+        <div id="fitBadge">
+            <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/></svg>
+            <span id="fitBadgeText">Fit (100%)</span>
+        </div>
+
         <div class="edge-slider" id="volEdge">
             <svg class="edge-icon" viewBox="0 0 24 24">
                 <path id="icoVolEdge"
@@ -2109,6 +2209,12 @@
                 </svg>
             </button>
 
+            <button class="ctl-btn" id="aspectBtn" aria-label="Screen Fit" title="Screen Fit / Aspect Ratio (Z)">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z" />
+                </svg>
+            </button>
+
             <button class="ctl-btn" id="setBtn" aria-label="Settings">
                 <svg viewBox="0 0 24 24">
                     <path
@@ -2154,6 +2260,27 @@
                     <button class="speed-pill" data-speed="1.25">1.25×</button>
                     <button class="speed-pill" data-speed="1.5">1.5×</button>
                     <button class="speed-pill" data-speed="2">2×</button>
+                </div>
+            </div>
+
+            <button class="dr-row" data-expand="secAspect">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z" />
+                </svg>
+                Screen fit / Aspect
+                <span class="dr-val" id="aspectVal">Fit</span>
+                <svg class="dr-chev" viewBox="0 0 24 24">
+                    <path d="M7 10l5 5 5-5z" />
+                </svg>
+            </button>
+            <div class="dr-sec" id="secAspect">
+                <div class="speed-pills" id="aspectPills">
+                    <button class="aspect-pill active" data-fit="contain">Fit</button>
+                    <button class="aspect-pill" data-fit="cover">Fill (Crop)</button>
+                    <button class="aspect-pill" data-fit="fill">Stretch</button>
+                    <button class="aspect-pill" data-fit="16:9">16:9</button>
+                    <button class="aspect-pill" data-fit="21:9">21:9</button>
+                    <button class="aspect-pill" data-fit="4:3">4:3</button>
                 </div>
             </div>
 
@@ -3062,12 +3189,66 @@
 
         /* speed pills */
         let normalSpeed = 1;
-        document.querySelectorAll('.speed-pill').forEach(p => p.addEventListener('click', () => {
+        document.querySelectorAll('#speedPills .speed-pill').forEach(p => p.addEventListener('click', () => {
             normalSpeed = parseFloat(p.dataset.speed);
             video.playbackRate = normalSpeed;
             $('speedVal').textContent = p.dataset.speed + '×';
-            document.querySelectorAll('.speed-pill').forEach(x => x.classList.toggle('active', x === p));
+            document.querySelectorAll('#speedPills .speed-pill').forEach(x => x.classList.toggle('active', x === p));
         }));
+
+        /* ================= ASPECT RATIO / SCREEN FIT ================= */
+        const FIT_MODES = [
+            { id: 'contain', label: 'Fit', desc: 'Fit (Original Ratio)' },
+            { id: 'cover',   label: 'Fill', desc: 'Fill Screen (Crop)' },
+            { id: 'fill',    label: 'Stretch', desc: 'Stretch (Full Screen)' },
+            { id: '16:9',    label: '16:9', desc: '16:9 Widescreen' },
+            { id: '21:9',    label: '21:9', desc: '21:9 Cinema' },
+            { id: '4:3',     label: '4:3', desc: '4:3 Standard' }
+        ];
+        let currentFitIdx = 0;
+        let fitBadgeTimer = null;
+
+        function setFitMode(modeId, flashToast = true) {
+            const idx = FIT_MODES.findIndex(m => m.id === modeId);
+            if (idx !== -1) currentFitIdx = idx;
+            const mode = FIT_MODES[currentFitIdx];
+
+            FIT_MODES.forEach(m => stage.classList.remove(`fit-${m.id.replace(':', '-')}`));
+            stage.classList.add(`fit-${mode.id.replace(':', '-')}`);
+
+            if ($('aspectVal')) $('aspectVal').textContent = mode.label;
+            document.querySelectorAll('#aspectPills .aspect-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.fit === mode.id);
+            });
+
+            if (flashToast) {
+                const badge = $('fitBadge'), text = $('fitBadgeText');
+                if (badge && text) {
+                    text.textContent = mode.desc;
+                    badge.classList.add('show');
+                    clearTimeout(fitBadgeTimer);
+                    fitBadgeTimer = setTimeout(() => badge.classList.remove('show'), 1200);
+                }
+            }
+        }
+
+        function cycleFitMode() {
+            currentFitIdx = (currentFitIdx + 1) % FIT_MODES.length;
+            setFitMode(FIT_MODES[currentFitIdx].id, true);
+        }
+
+        const aspectBtn = $('aspectBtn');
+        if (aspectBtn) aspectBtn.addEventListener('click', e => {
+            e.stopPropagation();
+            cycleFitMode();
+            wakeUI();
+        });
+
+        document.querySelectorAll('#aspectPills .aspect-pill').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setFitMode(btn.dataset.fit, true);
+            });
+        });
 
         /* ================= NATIVE AUDIO SETUP ================= */
         video.muted = false;
@@ -3840,6 +4021,10 @@
             }
             else if (e.code === 'KeyF') { document.fullscreenElement ? document.exitFullscreen() : goFullscreen(); }
             else if (e.code === 'KeyP') togglePip();
+            else if (e.code === 'KeyZ' || e.code === 'KeyA') {
+                e.preventDefault();
+                cycleFitMode();
+            }
             else if (e.code === 'KeyM') {
                 const next = (video.muted || video.volume === 0) ? (lastVol || 100) : 0;
                 setVolume(next);
