@@ -867,6 +867,28 @@
                 display: block;
             }
 
+            .title-audio-badge,
+            .title-res-badge {
+                font-size: 9.5px;
+                padding: 2px 6px;
+                gap: 4px;
+                border-radius: 5px;
+            }
+
+            .title-audio-badge .dot,
+            .title-res-badge .dot {
+                width: 5px;
+                height: 5px;
+            }
+
+            #audioHudBadge {
+                top: 56px;
+                font-size: 11.5px;
+                padding: 5px 13px;
+                gap: 6px;
+                border-radius: 16px;
+            }
+
             .title-action-btn {
                 position: absolute;
                 right: 14px;
@@ -1294,6 +1316,45 @@
             width: 16px;
             height: 16px;
             fill: #fff;
+        }
+
+        /* Audio HUD Toast (flashes audio tracks upon playback) */
+        #audioHudBadge {
+            position: absolute;
+            top: 22px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-6px);
+            z-index: 26;
+            background: rgba(10, 10, 15, 0.88);
+            border: 1px solid rgba(46, 204, 113, 0.45);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 18px rgba(46, 204, 113, 0.18);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-radius: 20px;
+            padding: 7px 18px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
+            max-width: 90vw;
+            white-space: nowrap;
+        }
+
+        #audioHudBadge.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #audioHudBadge svg {
+            width: 16px;
+            height: 16px;
+            fill: #2ecc71;
+            flex-shrink: 0;
         }
 
         /* ============ SEEK FEEDBACK — YouTube-style ripple ============
@@ -2436,6 +2497,8 @@
                 <div class="title-identity">
                     <span class="accent"></span>
                     <span class="name" id="movieName">Loading…</span>
+                    <span class="title-res-badge" id="titleResBadge"></span>
+                    <span class="title-audio-badge" id="titleAudioBadge"></span>
                 </div>
             </div>
             <button class="title-action-btn" id="titleReloadBtn" title="Reload player" aria-label="Reload player">
@@ -2453,6 +2516,11 @@
         <div id="fitBadge">
             <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/></svg>
             <span id="fitBadgeText">Fit (100%)</span>
+        </div>
+
+        <div id="audioHudBadge" class="audio-hud-badge">
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+            <span id="audioHudText">Audio: Loading…</span>
         </div>
 
         <div class="edge-slider" id="volEdge">
@@ -2686,8 +2754,8 @@
             </button>
             <div class="dr-sec" id="secAudio">
                 <div class="media-info-badges" id="mediaInfoBadges">
-                    <span class="title-res-badge" id="titleResBadge"></span>
-                    <span class="title-audio-badge" id="titleAudioBadge"></span>
+                    <span class="title-res-badge" id="drResBadge"></span>
+                    <span class="title-audio-badge" id="drAudioBadge"></span>
                 </div>
                 <div class="speed-pills" id="audioPills"></div>
                 <div class="dr-note" id="audioNote"></div>
@@ -2976,6 +3044,57 @@
             }
         }
 
+        async function fetchTitleDeep(url) {
+            if (!url) return;
+            const current = (movieName.textContent || '').trim();
+            if (current && current !== 'Loading…' && current !== 'Loading title…' && current !== 'Stream Video' && current !== 'STREAM' && !isOpaqueId(current)) {
+                return; // Already resolved a valid title
+            }
+
+            const targets = [url];
+            if (!url.startsWith('/api/proxy')) {
+                targets.push(`/api/proxy?url=${encodeURIComponent(url)}`);
+            }
+
+            for (const target of targets) {
+                try {
+                    const signal = AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined;
+                    const res = await fetch(target, {
+                        method: 'GET',
+                        headers: { Range: 'bytes=0-4096' },
+                        signal
+                    });
+                    const cd = res.headers.get('Content-Disposition') || '';
+                    let filename = '';
+                    const matchUtf = cd.match(/filename\*=UTF-8''([^";]+)/i);
+                    const matchStd = cd.match(/filename="?([^";]+)"?/i);
+                    if (matchUtf && matchUtf[1]) {
+                        filename = decodeURIComponent(matchUtf[1]);
+                    } else if (matchStd && matchStd[1]) {
+                        filename = matchStd[1];
+                    }
+
+                    if (!filename && res.url && !res.url.includes('/api/proxy')) {
+                        try {
+                            const u = new URL(res.url);
+                            const last = u.pathname.split('/').filter(Boolean).pop();
+                            if (last && !isOpaqueId(last)) filename = decodeURIComponent(last);
+                        } catch (e) { }
+                    }
+
+                    if (filename && !isOpaqueId(filename)) {
+                        const clean = cleanTitleString(filename);
+                        if (clean && !isOpaqueId(clean)) {
+                            movieName.textContent = clean;
+                            document.title = clean + ' · Stream Player Pro';
+                            try { localStorage.setItem('stream_title_cache:' + url, clean); } catch (e) { }
+                            return;
+                        }
+                    }
+                } catch (e) { }
+            }
+        }
+
         function preconnectOrigin(url) {
             try {
                 const origin = new URL(url).origin;
@@ -3036,6 +3155,23 @@
             return rawUrl;
         }
 
+        let currentAudioSummary = 'AAC Stereo';
+        let hasShownAudioToast = false;
+        let audioToastTimer = null;
+        let delayedPlayingCheckTimer = null;
+
+        function showAudioHudToast(label) {
+            const el = $('audioHudBadge'), txt = $('audioHudText');
+            if (!el || !txt) return;
+            const text = label || currentAudioSummary || 'Audio Active';
+            txt.textContent = text.startsWith('Audio:') ? text : `Audio: ${text}`;
+            el.classList.add('show');
+            clearTimeout(audioToastTimer);
+            audioToastTimer = setTimeout(() => {
+                el.classList.remove('show');
+            }, 3000);
+        }
+
         function loadStream(url, tryAutoPlay = true) {
             streamUrl = (url || '').trim();
             if (!streamUrl) {
@@ -3046,6 +3182,10 @@
             advanceLoader();
             showSpinner();
             metadataInspected = false;
+            hasShownAudioToast = false;
+            clearTimeout(delayedPlayingCheckTimer);
+            clearTimeout(audioToastTimer);
+            if ($('audioHudBadge')) $('audioHudBadge').classList.remove('show');
 
             // Show player stage controls and hide landing screen
             const landing = $('landingScreen');
@@ -3432,13 +3572,16 @@
         }
 
         function updateResolutionBadge() {
-            const resBadge = $('titleResBadge');
-            if (!resBadge) return;
+            const b1 = $('titleResBadge'), b2 = $('drResBadge');
             if (video.videoHeight && video.videoHeight > 0) {
                 const h = video.videoHeight;
                 const label = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
-                resBadge.innerHTML = `<span class="dot"></span> ${label}`;
-                resBadge.classList.add('show');
+                [b1, b2].forEach(b => {
+                    if (b) {
+                        b.innerHTML = `<span class="dot"></span> ${label}`;
+                        b.classList.add('show');
+                    }
+                });
             }
         }
 
@@ -3953,6 +4096,35 @@
             return tracks;
         }
 
+        function parseEbmlTitle(buf) {
+            if (!buf || buf.length < 16) return null;
+            // Scan for Segment Info (0x15, 0x49, 0xa9, 0x66) in header
+            for (let i = 0; i < Math.min(buf.length - 8, 131072); i++) {
+                if (buf[i] === 0x15 && buf[i + 1] === 0x49 && buf[i + 2] === 0xa9 && buf[i + 3] === 0x66) {
+                    let pos = i + 4;
+                    const infoSize = readVint(buf, pos);
+                    if (!infoSize) return null;
+                    pos += infoSize.len;
+                    const end = Math.min(buf.length, pos + infoSize.val);
+                    while (pos < end - 3) {
+                        const id = readEbmlId(buf, pos);
+                        if (!id) break;
+                        pos += id.len;
+                        const sz = readVint(buf, pos);
+                        if (!sz) break;
+                        pos += sz.len;
+                        if (id.val === 0x7ba9) { // Title element
+                            const t = readUtf8(buf, pos, sz.val);
+                            if (t && t.trim()) return t.trim();
+                        }
+                        pos += sz.val;
+                    }
+                    break;
+                }
+            }
+            return null;
+        }
+
         function parseMp4Tracks(buf) {
             if (buf.length < 32) return null;
             const view = new DataView(buf.buffer, buf.byteOffset, buf.byteLength);
@@ -4077,18 +4249,22 @@
             const audioSummaryStr = audioTracks.length > 1 ? `${audioTracks.length} audios` : (audioTracks[0]?.codec ? `${audioTracks[0].codec} Stereo` : 'AAC Stereo');
             val.textContent = audioSummaryStr;
 
-            // Update prominent titleBar audio badge
-            const titleBadge = $('titleAudioBadge');
-            if (titleBadge) {
-                if (audioTracks.length > 1) {
-                    titleBadge.innerHTML = `<span class="dot"></span> ${audioTracks.length} Audios (${audioLangs.slice(0, 3).join(', ')})`;
-                } else {
-                    const t0 = audioTracks[0] || {};
-                    titleBadge.innerHTML = `<span class="dot"></span> ${t0.codec || 'AAC'} ${t0.channels || 'Stereo'}`;
+            const badgeHtml = audioTracks.length > 1
+                ? `<span class="dot"></span> ${audioTracks.length} Audios (${audioLangs.slice(0, 2).join(', ')})`
+                : `<span class="dot"></span> ${audioTracks[0]?.codec || 'AAC'} ${audioTracks[0]?.channels || 'Stereo'}`;
+
+            currentAudioSummary = audioTracks.length > 1
+                ? `${audioTracks.length} Audios (${audioLangs.slice(0, 3).join(', ')})`
+                : `${audioTracks[0]?.lang ? audioTracks[0].lang + ' · ' : ''}${audioTracks[0]?.codec || 'AAC'} ${audioTracks[0]?.channels || 'Stereo'}`;
+
+            // Update prominent titleBar audio badge AND drawer audio badge
+            [$('titleAudioBadge'), $('drAudioBadge')].forEach(b => {
+                if (b) {
+                    b.innerHTML = badgeHtml;
+                    b.classList.add('show');
+                    b.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
                 }
-                titleBadge.classList.add('show');
-                titleBadge.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
-            }
+            });
 
             audioTracks.forEach((t, i) => {
                 const item = document.createElement('div');
@@ -4169,12 +4345,15 @@
                 if (dlBadge) dlBadge.textContent = `${at.length} audios`;
                 if (dlSummary) dlSummary.innerHTML = `<strong>Includes:</strong> ${names.join(', ')}`;
 
-                const titleBadge = $('titleAudioBadge');
-                if (titleBadge) {
-                    titleBadge.innerHTML = `<span class="dot"></span> ${at.length} Audios (${names.slice(0, 2).join(', ')})`;
-                    titleBadge.classList.add('show');
-                    titleBadge.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
-                }
+                currentAudioSummary = `${at.length} Audios (${names.slice(0, 2).join(', ')})`;
+                const badgeHtml = `<span class="dot"></span> ${at.length} Audios (${names.slice(0, 2).join(', ')})`;
+                [$('titleAudioBadge'), $('drAudioBadge')].forEach(b => {
+                    if (b) {
+                        b.innerHTML = badgeHtml;
+                        b.classList.add('show');
+                        b.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
+                    }
+                });
             } else {
                 // Render the active primary audio stream card
                 const item = document.createElement('div');
@@ -4196,59 +4375,103 @@
                 if (dlBadge) dlBadge.textContent = 'Audio included';
                 if (dlSummary) dlSummary.innerHTML = '<strong>Includes:</strong> Original Stream Audio (Stereo / Multi-channel)';
 
-                const titleBadge = $('titleAudioBadge');
-                if (titleBadge) {
-                    titleBadge.innerHTML = `<span class="dot"></span> AAC Stereo`;
-                    titleBadge.classList.add('show');
-                    titleBadge.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
-                }
+                currentAudioSummary = 'AAC Stereo';
+                const badgeHtml = `<span class="dot"></span> AAC Stereo`;
+                [$('titleAudioBadge'), $('drAudioBadge')].forEach(b => {
+                    if (b) {
+                        b.innerHTML = badgeHtml;
+                        b.classList.add('show');
+                        b.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
+                    }
+                });
             }
         }
 
         async function inspectMediaMetadata(url) {
             if (!url) return;
-            try {
-                const headSignal = AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined;
-                const head = await fetch(url, { method: 'HEAD', signal: headSignal });
-                // Check Content-Disposition for server-provided clean title
-                const cd = (head.headers.get('Content-Disposition') || '').match(/filename="?([^";]+)"?/i);
-                if (cd && cd[1]) {
-                    const cdName = cleanTitleString(cd[1]);
-                    if (cdName && !isOpaqueId(cdName)) {
-                        movieName.textContent = cdName;
-                        document.title = cdName + ' · Stream Player Pro';
-                        try { localStorage.setItem('stream_title_cache:' + url, cdName); } catch (e) { }
+            const targets = [url];
+            if (!url.startsWith('/api/proxy') && !url.includes('/api/proxy?url=')) {
+                targets.push(`/api/proxy?url=${encodeURIComponent(url)}`);
+            }
+
+            for (const target of targets) {
+                try {
+                    const headSignal = AbortSignal.timeout ? AbortSignal.timeout(3000) : undefined;
+                    const head = await fetch(target, { method: 'HEAD', signal: headSignal });
+                    // Check Content-Disposition for server-provided clean title
+                    const cd = head.headers.get('Content-Disposition') || '';
+                    let filename = '';
+                    const matchUtf = cd.match(/filename\*=UTF-8''([^";]+)/i);
+                    const matchStd = cd.match(/filename="?([^";]+)"?/i);
+                    if (matchUtf && matchUtf[1]) filename = decodeURIComponent(matchUtf[1]);
+                    else if (matchStd && matchStd[1]) filename = matchStd[1];
+
+                    if (filename && !isOpaqueId(filename)) {
+                        const cdName = cleanTitleString(filename);
+                        if (cdName && !isOpaqueId(cdName)) {
+                            movieName.textContent = cdName;
+                            document.title = cdName + ' · Stream Player Pro';
+                            try { localStorage.setItem('stream_title_cache:' + url, cdName); } catch (e) { }
+                        }
                     }
-                }
 
-                const xTracks = head.headers.get('X-Audio-Tracks') || head.headers.get('X-Media-Tracks');
-                if (xTracks) {
-                    const items = xTracks.split(',').map(s => ({ type: 'audio', name: s.trim(), codec: 'Audio', channels: '' }));
-                    renderMediaTracks(items);
-                    return;
-                }
-            } catch (e) { }
+                    const xTracks = head.headers.get('X-Audio-Tracks') || head.headers.get('X-Media-Tracks');
+                    if (xTracks) {
+                        const items = xTracks.split(',').map(s => ({ type: 'audio', name: s.trim(), codec: 'Audio', channels: '' }));
+                        renderMediaTracks(items);
+                        return;
+                    }
+                } catch (e) { }
 
-            try {
-                const rangeSignal = AbortSignal.timeout ? AbortSignal.timeout(4000) : undefined;
-                const res = await fetch(url, { headers: { Range: 'bytes=0-524287' }, signal: rangeSignal });
-                if (res.ok || res.status === 206) {
-                    const buf = new Uint8Array(await res.arrayBuffer());
-                    if (buf.length > 16 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
-                        const tracks = parseEbmlTracks(buf);
-                        if (tracks && tracks.length > 0) {
-                            renderMediaTracks(tracks);
+                try {
+                    const rangeSignal = AbortSignal.timeout ? AbortSignal.timeout(4500) : undefined;
+                    const res = await fetch(target, { headers: { Range: 'bytes=0-524287' }, signal: rangeSignal });
+                    if (res.ok || res.status === 206) {
+                        // Check Content-Disposition in range GET response
+                        const cd = res.headers.get('Content-Disposition') || '';
+                        let filename = '';
+                        const matchUtf = cd.match(/filename\*=UTF-8''([^";]+)/i);
+                        const matchStd = cd.match(/filename="?([^";]+)"?/i);
+                        if (matchUtf && matchUtf[1]) filename = decodeURIComponent(matchUtf[1]);
+                        else if (matchStd && matchStd[1]) filename = matchStd[1];
+
+                        if (filename && !isOpaqueId(filename)) {
+                            const cdName = cleanTitleString(filename);
+                            if (cdName && !isOpaqueId(cdName)) {
+                                movieName.textContent = cdName;
+                                document.title = cdName + ' · Stream Player Pro';
+                                try { localStorage.setItem('stream_title_cache:' + url, cdName); } catch (e) { }
+                            }
+                        }
+
+                        const buf = new Uint8Array(await res.arrayBuffer());
+                        if (buf.length > 16 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
+                            // Scan embedded MKV title
+                            const ebmlTitle = parseEbmlTitle(buf);
+                            if (ebmlTitle && !isOpaqueId(ebmlTitle)) {
+                                const clean = cleanTitleString(ebmlTitle);
+                                if (clean && !isOpaqueId(clean)) {
+                                    movieName.textContent = clean;
+                                    document.title = clean + ' · Stream Player Pro';
+                                    try { localStorage.setItem('stream_title_cache:' + url, clean); } catch (e) { }
+                                }
+                            }
+
+                            const tracks = parseEbmlTracks(buf);
+                            if (tracks && tracks.length > 0) {
+                                renderMediaTracks(tracks);
+                                return;
+                            }
+                        }
+                        const mp4Tracks = parseMp4Tracks(buf);
+                        if (mp4Tracks && mp4Tracks.length > 0) {
+                            renderMediaTracks(mp4Tracks);
                             return;
                         }
                     }
-                    const mp4Tracks = parseMp4Tracks(buf);
-                    if (mp4Tracks && mp4Tracks.length > 0) {
-                        renderMediaTracks(mp4Tracks);
-                        return;
-                    }
+                } catch (e) {
+                    console.warn('Metadata inspection target failed:', target, e);
                 }
-            } catch (e) {
-                console.warn('Metadata inspection:', e);
             }
             setupFallbackTracks();
         }
@@ -4729,6 +4952,32 @@
             hideSpinner();
             errBox.style.display = 'none';
             setPlayIcon();
+
+            // Perform delayed verification after a few seconds of playback (2.4s):
+            // 1. If stream title is still generic/opaque/loading, re-fetch via deep range request & proxy
+            // 2. Ensure audio metadata is inspected and flash the audio HUD toast capsule
+            clearTimeout(delayedPlayingCheckTimer);
+            delayedPlayingCheckTimer = setTimeout(() => {
+                if (video.paused) return;
+
+                // 1. Deep fetch title if not cleanly resolved
+                const cur = (movieName.textContent || '').trim();
+                if (!cur || cur === 'Loading…' || cur === 'Loading title…' || cur === 'Stream Video' || cur === 'STREAM' || isOpaqueId(cur)) {
+                    fetchTitleDeep(streamUrl);
+                }
+
+                // 2. Ensure media metadata is inspected
+                if (!metadataInspected && streamUrl) {
+                    metadataInspected = true;
+                    inspectMediaMetadata(streamUrl);
+                }
+
+                // 3. Display audio metadata toast once per stream playback session
+                if (!hasShownAudioToast) {
+                    hasShownAudioToast = true;
+                    showAudioHudToast(currentAudioSummary);
+                }
+            }, 2400);
         });
         video.addEventListener('timeupdate', () => {
             if (!video.paused && video.currentTime > 0 && video.readyState >= 3) {
