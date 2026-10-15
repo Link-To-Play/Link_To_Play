@@ -4399,13 +4399,15 @@
         if (controls) {
             controls.addEventListener('mouseenter', onEnterUI);
             controls.addEventListener('mouseleave', onLeaveUI);
+            controls.addEventListener('pointerdown', () => { wakeUI(4000); });
         }
         if (titleBar) {
             titleBar.addEventListener('mouseenter', onEnterUI);
             titleBar.addEventListener('mouseleave', onLeaveUI);
+            titleBar.addEventListener('pointerdown', () => { wakeUI(4000); });
         }
 
-        function wakeUI() {
+        function wakeUI(duration = 3500) {
             stage.classList.remove('hide-ui');
             clearTimeout(wakeUI.t);
             if (!video.paused && !isMouseOverUI) {
@@ -4414,14 +4416,18 @@
                         stage.classList.add('hide-ui');
                         volWrap.classList.remove('open');
                     }
-                }, 2800);
+                }, duration);
             }
         }
-        video.addEventListener('play', wakeUI);
+        video.addEventListener('play', () => wakeUI(3500));
         video.addEventListener('pause', () => { stage.classList.remove('hide-ui'); clearTimeout(wakeUI.t); });
 
-        /* Bottom hover / mouse movement triggers top and bottom UI */
+        /* Bottom hover / mouse movement triggers top and bottom UI (Desktop only) */
         stage.addEventListener('mousemove', e => {
+            // Ignore touch devices and synthetic mouse events
+            if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
+            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+
             const nearBottom = (window.innerHeight - e.clientY) <= Math.max(160, window.innerHeight * 0.25);
             if (nearBottom) {
                 stage.classList.add('mouse-near-bottom');
@@ -4458,6 +4464,7 @@
             if (e.pointerType === 'touch') {
                 try { stage.setPointerCapture(e.pointerId); } catch (_) { }
             }
+            const uiWasHidden = stage.classList.contains('hide-ui');
             g = {
                 x0: e.clientX, y0: e.clientY, t0: Date.now(),
                 mode: null,                    /* null | 'vol' | 'bri' */
@@ -4465,7 +4472,8 @@
                 startVol: video.volume * 100,
                 startBri: fx.bri,
                 moved: false,
-                pointerId: e.pointerId
+                pointerId: e.pointerId,
+                uiWasHidden: uiWasHidden
             };
             g.holdTimer = setTimeout(() => {
                 if (g && !g.moved && !g.mode) {
@@ -4536,20 +4544,23 @@
                     seekFx(g.side);
                 } else {
                     lastTap = now;
+                    const tapWasHidden = g.uiWasHidden;
+                    const isTouch = (e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
                     tapTimer = setTimeout(() => {
                         tapTimer = null;
-                        const isTouch = (e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
                         if (isTouch) {
-                            /* Mobile / touch: single tap wakes/toggles UI to check run time without pausing */
-                            if (stage.classList.contains('hide-ui')) {
-                                wakeUI();
+                            /* Mobile / touch: single tap toggles UI cleanly without pausing */
+                            if (tapWasHidden) {
+                                /* Tap to wake: show UI and keep it visible for 3.5s */
+                                wakeUI(3500);
                             } else {
+                                /* Tap to hide: dismiss immediately */
                                 stage.classList.add('hide-ui');
                                 clearTimeout(wakeUI.t);
                             }
                         } else {
                             /* Desktop mouse click: wakes UI and toggles play/pause */
-                            wakeUI();
+                            wakeUI(3500);
                             togglePlay();
                         }
                     }, TAP_MS);
