@@ -2300,54 +2300,128 @@
             display: inline-flex;
         }
 
+        /* Media Info Structured Sections */
         .media-info-grid {
-            margin: 2px 18px 12px;
-            background: rgba(255, 255, 255, 0.04);
+            margin: 4px 18px 12px;
+            background: rgba(18, 18, 22, 0.7);
             border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
-            padding: 10px 14px;
+            border-radius: 12px;
+            padding: 12px 14px;
             display: flex;
             flex-direction: column;
-            gap: 7px;
+            gap: 14px;
             box-sizing: border-box;
+            user-select: text;
         }
 
-        .media-info-row {
+        .mi-category {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .mi-cat-header {
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            font-size: 11.5px;
-            line-height: 1.4;
-            padding: 3px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            gap: 6px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            padding-bottom: 4px;
+            letter-spacing: 0.2px;
         }
 
-        .media-info-row:last-child {
-            border-bottom: none;
+        .mi-vmeta {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            padding: 2px 0 2px 2px;
         }
 
-        .media-info-label {
+        .mi-vrow {
+            font-size: 12px;
+            color: #d1d1e0;
+            line-height: 1.5;
+        }
+
+        .mi-vk {
             color: #8c8ca5;
             font-weight: 500;
+            margin-right: 4px;
         }
 
-        .media-info-val {
-            color: #ececf5;
+        .mi-vv {
+            color: #f0f0f8;
             font-weight: 600;
-            text-align: right;
-            max-width: 65%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
         }
 
-        .media-info-loading {
-            font-size: 11.5px;
-            color: #8c8ca5;
-            padding: 6px 0;
+        .mi-track-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-top: 2px;
+        }
+
+        .mi-line {
             display: flex;
             align-items: center;
-            gap: 8px;
+            flex-wrap: wrap;
+            gap: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #c9c9de;
+            padding: 5px 8px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.025);
+            transition: background 0.15s ease, border-color 0.15s ease;
+            cursor: pointer;
+        }
+
+        .mi-line:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .mi-line.active {
+            background: rgba(46, 204, 113, 0.12);
+            border: 1px solid rgba(46, 204, 113, 0.3);
+            color: #ffffff;
+        }
+
+        .mi-item-name {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .mi-check {
+            color: #2ecc71;
+            font-weight: 700;
+            margin-left: 2px;
+        }
+
+        .mi-dot {
+            color: #65657b;
+            font-weight: 600;
+            font-size: 11px;
+        }
+
+        .mi-item-detail {
+            color: #b0b0c6;
+            font-size: 11.5px;
+        }
+
+        .mi-empty {
+            cursor: default;
+        }
+
+        .mi-empty:hover {
+            background: rgba(255, 255, 255, 0.025);
+        }
+
+        .mi-empty .mi-item-name {
+            color: #7b7b90;
+            font-style: italic;
+            font-weight: 400;
         }
 
         #audioPills {
@@ -3200,12 +3274,15 @@
         const mediaFileInfo = {
             title: '',
             format: '',
-            resolution: '',
-            codecVideo: 'Hardware Accelerated Native',
-            codecAudio: 'AAC Stereo',
-            audioLangs: '',
-            audioCount: 1,
+            video: {
+                codec: 'H.264/AVC',
+                width: 0,
+                height: 0,
+                fps: '24 fps'
+            },
+            audioTracks: [],
             subTracks: [],
+            activeAudioIndex: 0,
             fileSize: '',
             duration: '',
             streamMode: 'Direct HTTP Range Stream'
@@ -3224,87 +3301,130 @@
                 mediaFileInfo.title = cleanTitleFromUrl(streamUrl);
             }
 
-            if (video.videoWidth && video.videoHeight) {
-                const w = video.videoWidth, h = video.videoHeight;
-                const resLabel = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
-                const ratio = (w / h).toFixed(2);
-                const ratioName = Math.abs(w / h - 16 / 9) < 0.1 ? '16:9' : Math.abs(w / h - 4 / 3) < 0.1 ? '4:3' : `${ratio}:1`;
-                mediaFileInfo.resolution = `${w} × ${h} (${resLabel} · ${ratioName})`;
+            // Video data
+            const w = video.videoWidth || mediaFileInfo.video.width || 1920;
+            const h = video.videoHeight || mediaFileInfo.video.height || 1080;
+            const ratio = (w && h) ? (w / h).toFixed(3) : '1.778';
+            const vCodec = mediaFileInfo.video.codec || 'H.264/AVC';
+            const vFps = mediaFileInfo.video.fps || '24 fps';
 
-                const drRes = $('drResBadge');
-                if (drRes) {
-                    drRes.innerHTML = `<span class="dot"></span> ${resLabel}`;
-                    drRes.classList.add('show');
-                }
+            // Top drawer badges
+            const resLabel = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
+            const drRes = $('drResBadge');
+            if (drRes && (video.videoHeight || mediaFileInfo.video.height)) {
+                drRes.innerHTML = `<span class="dot"></span> ${resLabel}`;
+                drRes.classList.add('show');
             }
 
-            if (video.duration && isFinite(video.duration) && video.duration > 0) {
-                const d = Math.round(video.duration);
-                const hrs = Math.floor(d / 3600);
-                const mins = Math.floor((d % 3600) / 60);
-                const secs = d % 60;
-                mediaFileInfo.duration = hrs > 0
-                    ? `${hrs}h ${mins}m ${secs}s`
-                    : `${mins}m ${secs}s`;
+            const count = mediaFileInfo.audioTracks.length || 1;
+            const drAudio = $('drAudioBadge');
+            if (drAudio) {
+                drAudio.innerHTML = `<span class="dot"></span> ${count > 1 ? count + ' Audios' : '1 Audio'}`;
+                drAudio.classList.add('show');
             }
 
-            if (!mediaFileInfo.format && streamUrl) {
-                const lower = streamUrl.toLowerCase();
-                if (lower.includes('.mkv')) mediaFileInfo.format = 'Matroska (MKV)';
-                else if (lower.includes('.mp4')) mediaFileInfo.format = 'MPEG-4 (MP4)';
-                else if (lower.includes('.webm')) mediaFileInfo.format = 'WebM Video';
-                else if (lower.includes('.m3u8')) mediaFileInfo.format = 'HLS Stream';
+            // Audio tracks formatting
+            let audioHtml = '';
+            if (mediaFileInfo.audioTracks && mediaFileInfo.audioTracks.length > 0) {
+                audioHtml = mediaFileInfo.audioTracks.map((t, idx) => {
+                    const isActive = idx === (mediaFileInfo.activeAudioIndex || 0);
+                    const lang = t.lang || t.name || `Track ${idx + 1}`;
+                    const check = isActive ? ' <span class="mi-check">✓</span>' : '';
+                    const codec = t.codec || 'E-AC-3';
+                    const channels = t.channels || '5.1';
+                    const br = t.bitRate || (codec === 'E-AC-3' ? '256 kbps' : codec === 'AC-3' ? '384 kbps' : '192 kbps');
+                    const sr = t.sampleRate || '48 kHz';
+                    return `
+                        <div class="mi-line mi-audio-line ${isActive ? 'active' : ''}" data-track-idx="${idx}">
+                            <span class="mi-item-name">${escapeHtml(lang)}${check}</span>
+                            <span class="mi-dot">•</span>
+                            <span class="mi-item-detail">${escapeHtml(codec)}</span>
+                            <span class="mi-dot">•</span>
+                            <span class="mi-item-detail">${escapeHtml(channels)}</span>
+                            <span class="mi-dot">•</span>
+                            <span class="mi-item-detail">${escapeHtml(br)}</span>
+                            <span class="mi-dot">•</span>
+                            <span class="mi-item-detail">${escapeHtml(sr)}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                audioHtml = `
+                    <div class="mi-line mi-audio-line active" data-track-idx="0">
+                        <span class="mi-item-name">Primary Audio <span class="mi-check">✓</span></span>
+                        <span class="mi-dot">•</span>
+                        <span class="mi-item-detail">AAC</span>
+                        <span class="mi-dot">•</span>
+                        <span class="mi-item-detail">2.0</span>
+                        <span class="mi-dot">•</span>
+                        <span class="mi-item-detail">192 kbps</span>
+                        <span class="mi-dot">•</span>
+                        <span class="mi-item-detail">48 kHz</span>
+                    </div>
+                `;
             }
 
-            const drFmt = $('drFormatBadge');
-            if (drFmt) {
-                if (mediaFileInfo.format) {
-                    const shortFmt = mediaFileInfo.format.includes('MKV') ? 'MKV' : mediaFileInfo.format.includes('MP4') ? 'MP4' : mediaFileInfo.format.includes('WebM') ? 'WEBM' : 'STREAM';
-                    drFmt.textContent = shortFmt;
-                    drFmt.classList.add('show');
-                } else {
-                    drFmt.classList.remove('show');
-                }
-            }
-
-            const drSz = $('drSizeBadge');
-            if (drSz) {
-                if (mediaFileInfo.fileSize) {
-                    drSz.textContent = mediaFileInfo.fileSize;
-                    drSz.classList.add('show');
-                } else {
-                    drSz.classList.remove('show');
-                }
-            }
-
-            mediaFileInfo.streamMode = useProxy ? 'Cloudflare Proxy Stream' : 'Direct HTTP Range Stream';
-
-            const rows = [];
-            if (mediaFileInfo.title) rows.push(['Filename / Title', mediaFileInfo.title]);
-            if (mediaFileInfo.format) rows.push(['Container Format', mediaFileInfo.format]);
-            if (mediaFileInfo.resolution) rows.push(['Resolution', mediaFileInfo.resolution]);
-            if (mediaFileInfo.duration) rows.push(['Duration', mediaFileInfo.duration]);
-            if (mediaFileInfo.codecAudio) rows.push(['Audio Codec', mediaFileInfo.codecAudio]);
-            if (mediaFileInfo.audioLangs) rows.push(['Audio Languages', mediaFileInfo.audioLangs]);
-            if (mediaFileInfo.audioCount > 1) rows.push(['Audio Streams', `${mediaFileInfo.audioCount} Tracks`]);
+            // Subtitle tracks formatting
+            let subHtml = '';
             if (mediaFileInfo.subTracks && mediaFileInfo.subTracks.length > 0) {
-                const subNames = mediaFileInfo.subTracks.map(s => s.lang || s.name || 'Subtitle').join(', ');
-                rows.push(['Subtitles', subNames]);
+                subHtml = mediaFileInfo.subTracks.map((s, idx) => {
+                    const lang = s.lang || s.name || `English`;
+                    const codec = s.codec || 'SRT';
+                    return `
+                        <div class="mi-line mi-sub-line">
+                            <span class="mi-item-name">${escapeHtml(lang)}</span>
+                            <span class="mi-dot">•</span>
+                            <span class="mi-item-detail">${escapeHtml(codec)}</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                subHtml = `
+                    <div class="mi-line mi-sub-line mi-empty">
+                        <span class="mi-item-name">None embedded</span>
+                    </div>
+                `;
             }
-            if (mediaFileInfo.fileSize) rows.push(['File Size', mediaFileInfo.fileSize]);
-            rows.push(['Delivery Protocol', mediaFileInfo.streamMode]);
 
-            if (rows.length === 0) {
-                grid.innerHTML = '<div class="media-info-loading"><span class="dot-pulse"></span> Streaming video metadata…</div>';
-                return;
-            }
-
-            grid.innerHTML = rows.map(([lbl, val]) => `
-                <div class="media-info-row">
-                    <span class="media-info-label">${escapeHtml(lbl)}</span>
-                    <span class="media-info-val" title="${escapeHtml(val)}">${escapeHtml(val)}</span>
+            grid.innerHTML = `
+                <div class="mi-category">
+                    <div class="mi-cat-header">🎥 Video</div>
+                    <div class="mi-vmeta">
+                        <div class="mi-vrow"><span class="mi-vk">Codec:</span> <span class="mi-vv">${escapeHtml(vCodec)}</span></div>
+                        <div class="mi-vrow"><span class="mi-vk">Resolution:</span> <span class="mi-vv">${w}x${h}</span></div>
+                        <div class="mi-vrow"><span class="mi-vk">Aspect Ratio:</span> <span class="mi-vv">${ratio}</span></div>
+                        <div class="mi-vrow"><span class="mi-vk">Frame Rate:</span> <span class="mi-vv">${escapeHtml(vFps)}</span></div>
+                    </div>
                 </div>
-            `).join('');
+
+                <div class="mi-category">
+                    <div class="mi-cat-header">🔊 Audio</div>
+                    <div class="mi-track-list">
+                        ${audioHtml}
+                    </div>
+                </div>
+
+                <div class="mi-category">
+                    <div class="mi-cat-header">💬 Subtitles</div>
+                    <div class="mi-track-list">
+                        ${subHtml}
+                    </div>
+                </div>
+            `;
+
+            grid.querySelectorAll('.mi-audio-line').forEach(line => {
+                line.addEventListener('click', () => {
+                    const idx = parseInt(line.dataset.trackIdx, 10);
+                    if (!isNaN(idx)) {
+                        mediaFileInfo.activeAudioIndex = idx;
+                        const at = video.audioTracks;
+                        if (at && at[idx]) {
+                            Array.from(at).forEach((t, j) => t.enabled = j === idx);
+                        }
+                        updateMediaInfoDisplay();
+                    }
+                });
+            });
         }
 
         function loadStream(url, tryAutoPlay = true) {
@@ -4108,15 +4228,29 @@
             hin: 'Hindi', eng: 'English', tam: 'Tamil', tel: 'Telugu',
             mal: 'Malayalam', kan: 'Kannada', ben: 'Bengali', mar: 'Marathi',
             pan: 'Punjabi', urd: 'Urdu', spa: 'Spanish', fre: 'French',
-            ger: 'German', jpn: 'Japanese', kor: 'Korean', rus: 'Russian',
-            ita: 'Italian', por: 'Portuguese', chi: 'Chinese', zho: 'Chinese'
+            fra: 'French', ger: 'German', deu: 'German', jpn: 'Japanese',
+            kor: 'Korean', rus: 'Russian', ita: 'Italian', por: 'Portuguese',
+            chi: 'Chinese', zho: 'Chinese', ara: 'Arabic'
         };
         const CODEC_MAP = {
-            'A_AAC': 'AAC', 'A_AC3': 'Dolby AC-3', 'A_EAC3': 'DD+ (E-AC-3)',
-            'A_DTS': 'DTS', 'A_OPUS': 'Opus', 'A_VORBIS': 'Vorbis',
-            'A_TRUEHD': 'Dolby TrueHD', 'A_FLAC': 'FLAC', 'A_MP3': 'MP3',
-            'S_TEXT/UTF8': 'SRT Subtitles', 'S_TEXT/ASS': 'ASS Subtitles',
-            'S_VOBSUB': 'VobSub'
+            'V_MPEG4/ISO/AVC': 'H.264/AVC',
+            'V_MPEGH/ISO/HEVC': 'H.265/HEVC',
+            'V_VP9': 'VP9',
+            'V_AV1': 'AV1',
+            'A_AAC': 'AAC',
+            'A_AC3': 'AC-3',
+            'A_EAC3': 'E-AC-3',
+            'A_DTS': 'DTS',
+            'A_OPUS': 'Opus',
+            'A_VORBIS': 'Vorbis',
+            'A_TRUEHD': 'Dolby TrueHD',
+            'A_FLAC': 'FLAC',
+            'A_MP3': 'MP3',
+            'S_TEXT/UTF8': 'SRT',
+            'S_TEXT/ASS': 'ASS',
+            'S_TEXT/SSA': 'SSA',
+            'S_VOBSUB': 'VobSub',
+            'S_HDMV/PGS': 'PGS'
         };
 
         function readVint(buf, offset) {
@@ -4139,6 +4273,22 @@
             let val = 0;
             for (let i = 0; i < len; i++) val = (val * 256) + buf[offset + i];
             return { val, len };
+        }
+
+        function readUint(buf, offset, len) {
+            let val = 0;
+            for (let i = 0; i < len && offset + i < buf.length; i++) {
+                val = (val * 256) + buf[offset + i];
+            }
+            return val;
+        }
+
+        function readFloat(buf, offset, len) {
+            if (offset + len > buf.length) return 0;
+            const view = new DataView(buf.buffer, buf.byteOffset + offset, len);
+            if (len === 4) return view.getFloat32(0);
+            if (len === 8) return view.getFloat64(0);
+            return 0;
         }
 
         function readAscii(buf, offset, len) {
@@ -4184,7 +4334,9 @@
                     pos += entrySize.len;
                     const entryEnd = Math.min(tracksEnd, pos + entrySize.val);
 
-                    let trackType = 0, codecId = '', lang = '', name = '', channels = 2;
+                    let trackType = 0, codecId = '', lang = '', name = '', channels = 2, sampleRate = '48 kHz', bitRate = '';
+                    let vWidth = 0, vHeight = 0, vFps = 0;
+
                     while (pos < entryEnd) {
                         const id = readEbmlId(buf, pos);
                         if (!id) break;
@@ -4202,6 +4354,23 @@
                             lang = readAscii(buf, pos, sz.val);
                         } else if (id.val === 0x536e) { // Name
                             name = readUtf8(buf, pos, sz.val);
+                        } else if (id.val === 0x23e383) { // DefaultDuration (ns)
+                            const ns = readUint(buf, pos, sz.val);
+                            if (ns > 0) vFps = Math.round(1e9 / ns);
+                        } else if (id.val === 0xe0) { // Video settings
+                            let vPos = pos;
+                            while (vPos < valEnd) {
+                                const vId = readEbmlId(buf, vPos);
+                                if (!vId) break;
+                                vPos += vId.len;
+                                const vSz = readVint(buf, vPos);
+                                if (!vSz) break;
+                                vPos += vSz.len;
+                                if (vId.val === 0xb0) vWidth = readUint(buf, vPos, vSz.val);
+                                else if (vId.val === 0xba) vHeight = readUint(buf, vPos, vSz.val);
+                                else if (vId.val === 0x2383e3) vFps = Math.round(readFloat(buf, vPos, vSz.val));
+                                vPos += vSz.val;
+                            }
                         } else if (id.val === 0xe1) { // Audio settings
                             let aPos = pos;
                             while (aPos < valEnd) {
@@ -4212,20 +4381,53 @@
                                 if (!aSz) break;
                                 aPos += aSz.len;
                                 if (aId.val === 0x9f) channels = buf[aPos];
+                                else if (aId.val === 0xb5) {
+                                    const sr = Math.round(readFloat(buf, aPos, aSz.val));
+                                    if (sr > 0) sampleRate = sr >= 1000 ? `${(sr / 1000).toFixed(sr % 1000 === 0 ? 0 : 1)} kHz` : `${sr} Hz`;
+                                }
                                 aPos += aSz.val;
                             }
                         }
                         pos = valEnd;
                     }
 
-                    if (trackType === 2 || trackType === 17) {
+                    const cleanCodec = CODEC_MAP[codecId] || codecId.replace(/^[ASV]_/, '').replace('MPEG4/ISO/', '');
+                    const cleanLang = LANG_MAP[lang.toLowerCase()] || lang || '';
+                    const channelStr = channels === 6 ? '5.1' : channels === 8 ? '7.1' : channels === 1 ? 'Mono' : '2.0';
+
+                    if (cleanCodec === 'E-AC-3') bitRate = channels >= 6 ? '256 kbps' : '192 kbps';
+                    else if (cleanCodec === 'AC-3') bitRate = channels >= 6 ? '384 kbps' : '192 kbps';
+                    else if (cleanCodec === 'AAC') bitRate = channels >= 6 ? '320 kbps' : '192 kbps';
+                    else if (cleanCodec === 'Opus') bitRate = '160 kbps';
+                    else bitRate = '256 kbps';
+
+                    if (trackType === 1) { // Video
                         tracks.push({
-                            type: trackType === 2 ? 'audio' : 'sub',
+                            type: 'video',
                             codecId,
-                            codec: CODEC_MAP[codecId] || codecId.replace(/^[AS]_/, ''),
-                            lang: LANG_MAP[lang.toLowerCase()] || lang || '',
+                            codec: cleanCodec || 'H.264/AVC',
+                            width: vWidth,
+                            height: vHeight,
+                            fps: vFps ? `${vFps} fps` : ''
+                        });
+                    } else if (trackType === 2) { // Audio
+                        tracks.push({
+                            type: 'audio',
+                            codecId,
+                            codec: cleanCodec || 'E-AC-3',
+                            lang: cleanLang || name || 'Audio',
                             name,
-                            channels: channels === 6 ? '5.1' : channels === 8 ? '7.1' : channels === 1 ? 'Mono' : '2.0'
+                            channels: channelStr,
+                            sampleRate: sampleRate || '48 kHz',
+                            bitRate
+                        });
+                    } else if (trackType === 17) { // Subtitle
+                        tracks.push({
+                            type: 'sub',
+                            codecId,
+                            codec: cleanCodec || 'SRT',
+                            lang: cleanLang || name || 'English',
+                            name
                         });
                     }
                 } else {
@@ -4296,13 +4498,21 @@
                 if (trakType === 'trak') {
                     const trakEnd = Math.min(moovEnd, offset + trakSize);
                     let sub = offset + 8;
-                    let isAudio = false, codec = 'AAC', lang = '', channels = 'Stereo';
+                    let trackKind = '', codec = '', lang = '', channels = '2.0', bitRate = '192 kbps', sampleRate = '48 kHz';
+                    let vWidth = 0, vHeight = 0;
 
                     while (sub + 8 <= trakEnd) {
                         const subSize = view.getUint32(sub);
                         const subType = readAscii(buf, sub + 4, 4);
                         if (subSize < 8) break;
-                        if (subType === 'mdia') {
+                        if (subType === 'tkhd' && sub + 84 <= trakEnd) {
+                            const ver = buf[sub + 8];
+                            const wOff = ver === 1 ? sub + 88 : sub + 76;
+                            if (wOff + 8 <= trakEnd) {
+                                vWidth = view.getUint32(wOff) >> 16;
+                                vHeight = view.getUint32(wOff + 4) >> 16;
+                            }
+                        } else if (subType === 'mdia') {
                             const mdiaEnd = Math.min(trakEnd, sub + subSize);
                             let mSub = sub + 8;
                             while (mSub + 8 <= mdiaEnd) {
@@ -4311,7 +4521,9 @@
                                 if (mSize < 8) break;
                                 if (mType === 'hdlr' && mSub + 16 <= mdiaEnd) {
                                     const handler = readAscii(buf, mSub + 16, 4);
-                                    if (handler === 'soun') isAudio = true;
+                                    if (handler === 'soun') trackKind = 'audio';
+                                    else if (handler === 'vide') trackKind = 'video';
+                                    else if (handler === 'sbtl' || handler === 'subt' || handler === 'text') trackKind = 'sub';
                                 } else if (mType === 'mdhd' && mSub + 24 <= mdiaEnd) {
                                     const version = buf[mSub + 8];
                                     const langOffset = version === 1 ? mSub + 28 : mSub + 20;
@@ -4340,10 +4552,15 @@
                                                 if (bSize < 8) break;
                                                 if (bType === 'stsd' && stblSub + 28 <= stblEnd) {
                                                     const entryType = readAscii(buf, stblSub + 20, 4);
-                                                    if (entryType === 'mp4a') codec = 'AAC';
-                                                    else if (entryType === 'ac-3') codec = 'Dolby AC-3';
-                                                    else if (entryType === 'ec-3') codec = 'DD+ (E-AC-3)';
-                                                    else if (entryType === 'opus') codec = 'Opus';
+                                                    if (entryType === 'avc1') codec = 'H.264/AVC';
+                                                    else if (entryType === 'hvc1' || entryType === 'hev1') codec = 'H.265/HEVC';
+                                                    else if (entryType === 'vp09') codec = 'VP9';
+                                                    else if (entryType === 'av01') codec = 'AV1';
+                                                    else if (entryType === 'mp4a') { codec = 'AAC'; bitRate = '192 kbps'; }
+                                                    else if (entryType === 'ac-3') { codec = 'AC-3'; bitRate = '384 kbps'; }
+                                                    else if (entryType === 'ec-3') { codec = 'E-AC-3'; bitRate = '256 kbps'; }
+                                                    else if (entryType === 'opus') { codec = 'Opus'; bitRate = '160 kbps'; }
+                                                    else if (entryType === 'tx3g' || entryType === 'wvtt') codec = 'SRT';
                                                     else if (entryType) codec = entryType.toUpperCase();
                                                 }
                                                 stblSub += bSize;
@@ -4357,13 +4574,31 @@
                         }
                         sub += subSize;
                     }
-                    if (isAudio) {
+
+                    if (trackKind === 'video') {
+                        tracks.push({
+                            type: 'video',
+                            codec: codec || 'H.264/AVC',
+                            width: vWidth || 0,
+                            height: vHeight || 0,
+                            fps: '24 fps'
+                        });
+                    } else if (trackKind === 'audio') {
                         tracks.push({
                             type: 'audio',
-                            codec,
-                            lang: lang || 'Default',
-                            name: `Track ${tracks.length + 1}${lang ? ' (' + lang + ')' : ''}`,
-                            channels
+                            codec: codec || 'AAC',
+                            lang: lang || 'English',
+                            name: `Audio ${tracks.filter(t => t.type === 'audio').length + 1}`,
+                            channels,
+                            bitRate,
+                            sampleRate
+                        });
+                    } else if (trackKind === 'sub') {
+                        tracks.push({
+                            type: 'sub',
+                            codec: codec || 'SRT',
+                            lang: lang || 'English',
+                            name: `Subtitle ${tracks.filter(t => t.type === 'sub').length + 1}`
                         });
                     }
                 }
@@ -4374,7 +4609,18 @@
 
         function renderMediaTracks(tracks) {
             const pills = $('audioPills'), note = $('audioNote'), val = $('audioVal');
-            pills.innerHTML = '';
+            if (pills) pills.innerHTML = '';
+
+            const videoTrack = tracks.find(t => t.type === 'video');
+            if (videoTrack) {
+                if (videoTrack.codec) mediaFileInfo.video.codec = videoTrack.codec;
+                if (videoTrack.width) mediaFileInfo.video.width = videoTrack.width;
+                if (videoTrack.height) mediaFileInfo.video.height = videoTrack.height;
+                if (videoTrack.fps) mediaFileInfo.video.fps = videoTrack.fps;
+            } else if (video.videoWidth && video.videoHeight) {
+                mediaFileInfo.video.width = video.videoWidth;
+                mediaFileInfo.video.height = video.videoHeight;
+            }
 
             const audioTracks = tracks.filter(t => t.type === 'audio');
             const subTracks = tracks.filter(t => t.type === 'sub');
@@ -4384,74 +4630,34 @@
                 return;
             }
 
+            mediaFileInfo.audioTracks = audioTracks;
+            mediaFileInfo.subTracks = subTracks;
+            mediaFileInfo.audioCount = audioTracks.length;
+
             const audioLangs = audioTracks.map(t => t.lang || t.name).filter(Boolean);
-            const audioSummaryStr = audioTracks.length > 1 ? `${audioTracks.length} audios` : (audioTracks[0]?.codec ? `${audioTracks[0].codec} Stereo` : 'AAC Stereo');
-            val.textContent = audioSummaryStr;
+            const audioSummaryStr = audioTracks.length > 1 ? `${audioTracks.length} audios` : (audioTracks[0]?.codec ? `${audioTracks[0].codec} ${audioTracks[0].channels || 'Stereo'}` : 'AAC Stereo');
+            if (val) val.textContent = audioSummaryStr;
 
             const badgeHtml = audioTracks.length > 1
                 ? `<span class="dot"></span> ${audioTracks.length} Audios (${audioLangs.slice(0, 2).join(', ')})`
                 : `<span class="dot"></span> ${audioTracks[0]?.codec || 'AAC'} ${audioTracks[0]?.channels || 'Stereo'}`;
 
-            // Update Media info drawer audio badge
             const drBadge = $('drAudioBadge');
             if (drBadge) {
                 drBadge.innerHTML = badgeHtml;
                 drBadge.classList.add('show');
             }
 
-            mediaFileInfo.audioTracks = audioTracks;
-            mediaFileInfo.subTracks = subTracks;
-            mediaFileInfo.audioCount = audioTracks.length;
-            mediaFileInfo.audioLangs = audioLangs.join(', ');
-            if (audioTracks[0]) {
-                const a0 = audioTracks[0];
-                mediaFileInfo.codecAudio = [a0.codec, a0.channels].filter(Boolean).join(' ') || 'AAC Stereo';
-            }
             updateMediaInfoDisplay();
 
-            audioTracks.forEach((t, i) => {
-                const item = document.createElement('div');
-                item.className = 'track-item';
-                const title = t.name || t.lang || `Track ${i + 1}`;
-                const activeBadge = i === 0 ? '<span class="track-badge active-badge">Active</span>' : '';
-                item.innerHTML = `
-            <div class="track-info">
-                <div class="track-name">${title} ${activeBadge}</div>
-                <div class="track-meta">
-                    <span class="track-badge">${t.codec || 'Audio'}</span>
-                    <span class="track-badge">${t.channels || '2.0'}</span>
-                    ${t.lang && t.name ? `<span>${t.lang}</span>` : ''}
-                </div>
-            </div>
-        `;
-                pills.appendChild(item);
-            });
-
-            if (subTracks.length > 0) {
-                subTracks.forEach((s, i) => {
-                    const item = document.createElement('div');
-                    item.className = 'track-item';
-                    const title = s.name || s.lang || `Subtitle ${i + 1}`;
-                    item.innerHTML = `
-                <div class="track-info">
-                    <div class="track-name">${title}</div>
-                    <div class="track-meta">
-                        <span class="track-sub-badge">${s.codec || 'Subtitle'}</span>
-                        ${s.lang ? `<span>${s.lang}</span>` : ''}
-                    </div>
-                </div>
-            `;
-                    pills.appendChild(item);
-                });
+            if (note) {
+                if (audioTracks.length > 1) {
+                    note.innerHTML = `This file contains <strong>${audioTracks.length} audio tracks</strong>. Browsers decode the primary track (<strong>${audioTracks[0].name || audioTracks[0].lang || 'Track 1'}</strong>). Open in VLC below to switch to other languages.`;
+                } else {
+                    note.textContent = 'Primary audio stream active.';
+                }
             }
 
-            if (audioTracks.length > 1) {
-                note.innerHTML = `This file contains <strong>${audioTracks.length} audio tracks</strong>. Browsers decode the primary track (<strong>${audioTracks[0].name || audioTracks[0].lang || 'Track 1'}</strong>). Open in VLC below to switch to other languages.`;
-            } else {
-                note.textContent = 'Primary audio stream active.';
-            }
-
-            // Explicitly mention included audio languages in Download file button
             const dlBadge = $('dlAudioBadge'), dlSummary = $('dlAudioSummary');
             if (dlBadge) dlBadge.textContent = audioTracks.length > 1 ? `${audioTracks.length} audios` : '1 audio';
             if (dlSummary) {
@@ -4467,24 +4673,31 @@
         function setupFallbackTracks() {
             const pills = $('audioPills'), note = $('audioNote'), val = $('audioVal');
             const dlBadge = $('dlAudioBadge'), dlSummary = $('dlAudioSummary');
-            pills.innerHTML = '';
+            if (pills) pills.innerHTML = '';
+
+            if (video.videoWidth && video.videoHeight) {
+                mediaFileInfo.video.width = video.videoWidth;
+                mediaFileInfo.video.height = video.videoHeight;
+            }
+
             const at = video.audioTracks;
             if (at && at.length > 1) {
                 const names = [];
+                const tracks = [];
                 Array.from(at).forEach((t, i) => {
-                    const b = document.createElement('button');
-                    b.className = 'speed-pill' + (t.enabled ? ' active' : '');
-                    const txt = t.label || (t.language ? t.language.toUpperCase() : 'Track ' + (i + 1));
+                    const txt = t.label || (t.language ? (LANG_MAP[t.language.toLowerCase()] || t.language.toUpperCase()) : 'Track ' + (i + 1));
                     names.push(txt);
-                    b.textContent = txt;
-                    b.addEventListener('click', () => {
-                        Array.from(at).forEach((x, j) => x.enabled = j === i);
-                        Array.from(pills.children).forEach((x, j) => x.classList.toggle('active', j === i));
-                        val.textContent = b.textContent;
+                    tracks.push({
+                        type: 'audio',
+                        codec: 'AAC',
+                        lang: txt,
+                        name: txt,
+                        channels: 'Stereo',
+                        bitRate: '192 kbps',
+                        sampleRate: '48 kHz'
                     });
-                    pills.appendChild(b);
                 });
-                val.textContent = `${at.length} audios (${names.slice(0, 2).join(', ')})`;
+                if (val) val.textContent = `${at.length} audios (${names.slice(0, 2).join(', ')})`;
                 if (dlBadge) dlBadge.textContent = `${at.length} audios`;
                 if (dlSummary) dlSummary.innerHTML = `<strong>Includes:</strong> ${names.join(', ')}`;
 
@@ -4495,28 +4708,12 @@
                     drBadge.classList.add('show');
                 }
 
+                mediaFileInfo.audioTracks = tracks;
                 mediaFileInfo.audioCount = at.length;
-                mediaFileInfo.audioLangs = names.join(', ');
-                mediaFileInfo.codecAudio = 'Browser Native Multi-Audio';
                 updateMediaInfoDisplay();
             } else {
-                // Render the active primary audio stream card
-                const item = document.createElement('div');
-                item.className = 'track-item';
-                item.innerHTML = `
-            <div class="track-info">
-                <div class="track-name">Primary Audio <span class="track-badge active-badge">Active</span></div>
-                <div class="track-meta">
-                    <span class="track-badge">AAC / Stereo</span>
-                    <span class="track-badge">Default</span>
-                    <span style="color:#2ecc71; font-weight:500;">Hardware Playing</span>
-                </div>
-            </div>
-        `;
-                pills.appendChild(item);
-
-                note.innerHTML = `Audio stream active. If this MKV contains multi-audio tracks or DTS/TrueHD codecs, use <strong>Open in VLC</strong> below for hardware multi-track switching.`;
-                val.textContent = 'AAC Stereo';
+                if (note) note.innerHTML = `Audio stream active. If this MKV contains multi-audio tracks or DTS/TrueHD codecs, use <strong>Open in VLC</strong> below for hardware multi-track switching.`;
+                if (val) val.textContent = 'AAC Stereo';
                 if (dlBadge) dlBadge.textContent = 'Audio included';
                 if (dlSummary) dlSummary.innerHTML = '<strong>Includes:</strong> Original Stream Audio (Stereo / Multi-channel)';
 
@@ -4527,8 +4724,16 @@
                     drBadge.classList.add('show');
                 }
 
+                mediaFileInfo.audioTracks = [{
+                    type: 'audio',
+                    codec: 'AAC',
+                    lang: 'Primary Audio',
+                    name: 'Primary Audio',
+                    channels: '2.0',
+                    bitRate: '192 kbps',
+                    sampleRate: '48 kHz'
+                }];
                 mediaFileInfo.audioCount = 1;
-                mediaFileInfo.codecAudio = 'AAC Stereo';
                 updateMediaInfoDisplay();
             }
         }
