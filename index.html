@@ -1108,11 +1108,23 @@
             opacity: 0;
             transform: scale(0.92);
             transition: opacity 200ms ease, transform 200ms ease;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         #centerIcon.on {
             opacity: 1;
             transform: scale(1);
+        }
+
+        #centerIcon.sticky {
+            pointer-events: auto !important;
+            cursor: pointer;
+        }
+
+        #centerIcon.sticky:active {
+            transform: scale(0.90);
         }
 
         #centerIcon svg {
@@ -3318,13 +3330,18 @@
            after() → runs after the flash completes (e.g. settle into sticky play). */
         function showCenter(path, sticky, after) {
             centerPath.setAttribute('d', path);
-            centerIcon.classList.remove('on');
+            centerIcon.classList.remove('on', 'sticky');
             void centerIcon.offsetWidth;            /* restart the fade-in cleanly */
             centerIcon.classList.add('on');
+            if (sticky) {
+                centerIcon.classList.add('sticky');
+            } else {
+                centerIcon.classList.remove('sticky');
+            }
             clearTimeout(centerTimer);
             if (!sticky) {
                 centerTimer = setTimeout(() => {
-                    centerIcon.classList.remove('on');
+                    centerIcon.classList.remove('on', 'sticky');
                     if (after) setTimeout(after, 200);   /* let the fade finish first */
                 }, 550);
             }
@@ -3346,6 +3363,21 @@
             }
         }
         playBtn.addEventListener('click', togglePlay);
+
+        /* Center Resume / Play button handler */
+        centerIcon.addEventListener('pointerdown', e => {
+            if (centerIcon.classList.contains('sticky') || video.paused || video.ended) {
+                e.stopPropagation();
+            }
+        });
+        centerIcon.addEventListener('click', e => {
+            if (centerIcon.classList.contains('sticky') || video.paused || video.ended) {
+                e.stopPropagation();
+                togglePlay();
+                wakeUI(3500);
+            }
+        });
+
         video.addEventListener('play', () => {
             setPlayIcon();
             requestWakeLock();
@@ -4278,7 +4310,7 @@
         let holding = false;
 
         function inControls(e) {
-            return e.target.closest('#controls, #volPop, .modal-overlay, #settingsDrawer, #drawerOverlay');
+            return e.target.closest('#controls, #volPop, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
         }
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
