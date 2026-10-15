@@ -981,6 +981,10 @@
                 width: 44px;
                 height: 44px;
             }
+
+            #briEdge {
+                display: none !important;
+            }
         }
 
         /* ============ DYNAMIC RESPONSIVE CONTROL HUB CLASSES (Video.js Architecture) ============ */
@@ -1025,6 +1029,7 @@
         #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
         #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
         #stage.layout-mobile #fsBtn { order: 8; padding: 4px 0 4px 6px; }
+        #stage.layout-mobile #briEdge { display: none !important; }
 
         /* Tablet / Landscape Hub (Single Row Compact Floating Capsule) */
         #stage.layout-tablet #controls {
@@ -1056,6 +1061,7 @@
         #stage.layout-tablet #aspectBtn { order: unset; }
         #stage.layout-tablet #setBtn { order: unset; }
         #stage.layout-tablet #fsBtn { order: unset; }
+        #stage.layout-tablet #briEdge { display: none !important; }
 
         /* Desktop Hub (Expansive Widescreen Floating Capsule) */
         #stage.layout-desktop #controls {
@@ -4527,6 +4533,8 @@
         stage.addEventListener('pointermove', e => {
             if (!g) return;
             if (holding) return; // In 2x playback mode, stay in 2x until finger lifted
+            const isMobile = (stage && stage.classList.contains('layout-mobile')) || (window.innerWidth <= 768) || (e.pointerType === 'touch');
+            if (isMobile) return; // Screen brightness slider and gesture removed on mobile view
             const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
             if (!g.mode && Math.abs(dy) > SWIPE_THRESH && Math.abs(dy) > Math.abs(dx) * 1.4) {
                 if (g.side === 'R') {
