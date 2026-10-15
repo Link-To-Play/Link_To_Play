@@ -1917,22 +1917,81 @@
             display: flex;
         }
 
+        .landing-aurora {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .aurora-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            opacity: 0.65;
+            animation: orbFloat 14s infinite alternate ease-in-out;
+        }
+
+        .orb-1 {
+            width: 440px;
+            height: 440px;
+            background: radial-gradient(circle, rgba(229, 9, 20, 0.45) 0%, transparent 70%);
+            top: 15%;
+            left: 18%;
+        }
+
+        .orb-2 {
+            width: 480px;
+            height: 480px;
+            background: radial-gradient(circle, rgba(43, 114, 238, 0.42) 0%, transparent 70%);
+            bottom: 12%;
+            right: 15%;
+            animation-duration: 18s;
+            animation-delay: -5s;
+        }
+
+        .orb-3 {
+            width: 360px;
+            height: 360px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.35) 0%, transparent 70%);
+            top: 42%;
+            left: 55%;
+            animation-duration: 12s;
+            animation-delay: -8s;
+        }
+
+        @keyframes orbFloat {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(40px, -30px) scale(1.08); }
+            100% { transform: translate(-30px, 40px) scale(0.95); }
+        }
+
         .landing-card {
-            background: rgba(18, 18, 26, 0.88);
-            backdrop-filter: blur(32px);
-            -webkit-backdrop-filter: blur(32px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 1px 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-            border-radius: 20px;
+            background: rgba(16, 16, 24, 0.72);
+            backdrop-filter: blur(32px) saturate(140%);
+            -webkit-backdrop-filter: blur(32px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 1px 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
             width: 100%;
             max-width: 560px;
             margin: auto;
-            padding: 30px 26px;
+            padding: 34px 30px;
             color: #fff;
             text-align: left;
             animation: landingFade 0.35s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
+            z-index: 2;
             box-sizing: border-box;
+        }
+
+        .landing-card.liquidgl-active {
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            border-color: rgba(255, 255, 255, 0.22) !important;
+            box-shadow: 0 32px 80px rgba(0, 0, 0, 0.9), 0 0 1px 1px rgba(255, 255, 255, 0.08) !important;
         }
 
         @keyframes landingFade {
@@ -2546,7 +2605,12 @@
 
         <!-- ============ LANDING SCREEN (when no ?video= is provided) ============ -->
         <div id="landingScreen">
-            <div class="landing-card">
+            <div class="landing-aurora">
+                <div class="aurora-orb orb-1"></div>
+                <div class="aurora-orb orb-2"></div>
+                <div class="aurora-orb orb-3"></div>
+            </div>
+            <div class="landing-card liquidgl-lens">
                 <div class="landing-brand">
                     <span class="accent"></span>
                     <h1>STREAM PLAYER <span class="landing-badge">PRO v2.0</span></h1>
@@ -3500,6 +3564,7 @@
 
             $('titleBar').style.display = 'flex';
             $('controls').style.display = 'flex';
+            if ($('capsuleHud')) $('capsuleHud').style.display = '';
             centerIcon.style.display = 'flex';
             if ($('drResBadge')) $('drResBadge').classList.remove('show');
             if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
@@ -3579,6 +3644,10 @@
             if (landing) landing.classList.add('show');
             $('titleBar').style.display = 'none';
             $('controls').style.display = 'none';
+            if ($('capsuleHud')) {
+                $('capsuleHud').classList.remove('show');
+                $('capsuleHud').style.display = 'none';
+            }
             centerIcon.style.display = 'none';
             hideSpinner(true);
             if ($('drResBadge')) $('drResBadge').classList.remove('show');
@@ -3589,6 +3658,7 @@
                 video.removeAttribute('src');
                 video.load();
             } catch (e) { }
+            setTimeout(initLiquidGlass, 150);
         }
 
         /* ================= LANDING SCREEN SETUP ================= */
@@ -5230,6 +5300,7 @@
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
         function updateCapsuleHud(pathD, pct, displayStr) {
+            if ($('landingScreen') && $('landingScreen').classList.contains('show')) return;
             const ch = $('capsuleHud');
             if (!ch) return;
             const clip = $('chClip');
