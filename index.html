@@ -2375,11 +2375,7 @@
             border-radius: 6px;
             background: rgba(255, 255, 255, 0.025);
             transition: background 0.15s ease, border-color 0.15s ease;
-            cursor: pointer;
-        }
-
-        .mi-line:hover {
-            background: rgba(255, 255, 255, 0.05);
+            cursor: default;
         }
 
         .mi-line.active {
@@ -3323,19 +3319,19 @@
                 drAudio.classList.add('show');
             }
 
-            // Audio tracks formatting
+            // Audio tracks formatting (purely informational, marking default audio stream)
             let audioHtml = '';
             if (mediaFileInfo.audioTracks && mediaFileInfo.audioTracks.length > 0) {
                 audioHtml = mediaFileInfo.audioTracks.map((t, idx) => {
-                    const isActive = idx === (mediaFileInfo.activeAudioIndex || 0);
+                    const isDefault = idx === 0;
                     const lang = t.lang || t.name || `Track ${idx + 1}`;
-                    const check = isActive ? ' <span class="mi-check">✓</span>' : '';
+                    const check = isDefault ? ' <span class="mi-check">✓</span>' : '';
                     const codec = t.codec || 'E-AC-3';
                     const channels = t.channels || '5.1';
                     const br = t.bitRate || (codec === 'E-AC-3' ? '256 kbps' : codec === 'AC-3' ? '384 kbps' : '192 kbps');
                     const sr = t.sampleRate || '48 kHz';
                     return `
-                        <div class="mi-line mi-audio-line ${isActive ? 'active' : ''}" data-track-idx="${idx}">
+                        <div class="mi-line mi-audio-line ${isDefault ? 'active' : ''}">
                             <span class="mi-item-name">${escapeHtml(lang)}${check}</span>
                             <span class="mi-dot">•</span>
                             <span class="mi-item-detail">${escapeHtml(codec)}</span>
@@ -3350,7 +3346,7 @@
                 }).join('');
             } else {
                 audioHtml = `
-                    <div class="mi-line mi-audio-line active" data-track-idx="0">
+                    <div class="mi-line mi-audio-line active">
                         <span class="mi-item-name">Primary Audio <span class="mi-check">✓</span></span>
                         <span class="mi-dot">•</span>
                         <span class="mi-item-detail">AAC</span>
@@ -3411,20 +3407,6 @@
                     </div>
                 </div>
             `;
-
-            grid.querySelectorAll('.mi-audio-line').forEach(line => {
-                line.addEventListener('click', () => {
-                    const idx = parseInt(line.dataset.trackIdx, 10);
-                    if (!isNaN(idx)) {
-                        mediaFileInfo.activeAudioIndex = idx;
-                        const at = video.audioTracks;
-                        if (at && at[idx]) {
-                            Array.from(at).forEach((t, j) => t.enabled = j === idx);
-                        }
-                        updateMediaInfoDisplay();
-                    }
-                });
-            });
         }
 
         function loadStream(url, tryAutoPlay = true) {
