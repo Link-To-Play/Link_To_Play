@@ -881,14 +881,6 @@
                 height: 5px;
             }
 
-            #audioHudBadge {
-                top: 56px;
-                font-size: 11.5px;
-                padding: 5px 13px;
-                gap: 6px;
-                border-radius: 16px;
-            }
-
             .title-action-btn {
                 position: absolute;
                 right: 14px;
@@ -1316,45 +1308,6 @@
             width: 16px;
             height: 16px;
             fill: #fff;
-        }
-
-        /* Audio HUD Toast (flashes audio tracks upon playback) */
-        #audioHudBadge {
-            position: absolute;
-            top: 22px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-6px);
-            z-index: 26;
-            background: rgba(10, 10, 15, 0.88);
-            border: 1px solid rgba(46, 204, 113, 0.45);
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.6), 0 0 18px rgba(46, 204, 113, 0.18);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border-radius: 20px;
-            padding: 7px 18px;
-            color: #fff;
-            font-size: 13px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.25s ease, transform 0.25s cubic-bezier(0.34, 1.3, 0.64, 1);
-            max-width: 90vw;
-            white-space: nowrap;
-        }
-
-        #audioHudBadge.show {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        #audioHudBadge svg {
-            width: 16px;
-            height: 16px;
-            fill: #2ecc71;
-            flex-shrink: 0;
         }
 
         /* ============ SEEK FEEDBACK — YouTube-style ripple ============
@@ -2318,6 +2271,85 @@
             flex-wrap: wrap;
         }
 
+        .title-format-badge,
+        .title-size-badge {
+            display: none;
+            align-items: center;
+            gap: 5px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 6px;
+            padding: 3px 8px;
+            letter-spacing: 0.3px;
+        }
+
+        .title-format-badge {
+            color: #85b8ff;
+            background: rgba(43, 114, 238, 0.16);
+            border: 1px solid rgba(43, 114, 238, 0.35);
+        }
+
+        .title-size-badge {
+            color: #f6c85f;
+            background: rgba(246, 200, 95, 0.14);
+            border: 1px solid rgba(246, 200, 95, 0.32);
+        }
+
+        .title-format-badge.show,
+        .title-size-badge.show {
+            display: inline-flex;
+        }
+
+        .media-info-grid {
+            margin: 2px 18px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            box-sizing: border-box;
+        }
+
+        .media-info-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11.5px;
+            line-height: 1.4;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .media-info-row:last-child {
+            border-bottom: none;
+        }
+
+        .media-info-label {
+            color: #8c8ca5;
+            font-weight: 500;
+        }
+
+        .media-info-val {
+            color: #ececf5;
+            font-weight: 600;
+            text-align: right;
+            max-width: 65%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .media-info-loading {
+            font-size: 11.5px;
+            color: #8c8ca5;
+            padding: 6px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         #audioPills {
             display: flex;
             flex-direction: column;
@@ -2497,8 +2529,6 @@
                 <div class="title-identity">
                     <span class="accent"></span>
                     <span class="name" id="movieName">Loading…</span>
-                    <span class="title-res-badge" id="titleResBadge"></span>
-                    <span class="title-audio-badge" id="titleAudioBadge"></span>
                 </div>
             </div>
             <button class="title-action-btn" id="titleReloadBtn" title="Reload player" aria-label="Reload player">
@@ -2516,11 +2546,6 @@
         <div id="fitBadge">
             <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/></svg>
             <span id="fitBadgeText">Fit (100%)</span>
-        </div>
-
-        <div id="audioHudBadge" class="audio-hud-badge">
-            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
-            <span id="audioHudText">Audio: Loading…</span>
         </div>
 
         <div class="edge-slider" id="volEdge">
@@ -2756,7 +2781,10 @@
                 <div class="media-info-badges" id="mediaInfoBadges">
                     <span class="title-res-badge" id="drResBadge"></span>
                     <span class="title-audio-badge" id="drAudioBadge"></span>
+                    <span class="title-format-badge" id="drFormatBadge"></span>
+                    <span class="title-size-badge" id="drSizeBadge"></span>
                 </div>
+                <div class="media-info-grid" id="mediaInfoGrid"></div>
                 <div class="speed-pills" id="audioPills"></div>
                 <div class="dr-note" id="audioNote"></div>
             </div>
@@ -3155,21 +3183,128 @@
             return rawUrl;
         }
 
-        let currentAudioSummary = 'AAC Stereo';
-        let hasShownAudioToast = false;
-        let audioToastTimer = null;
+        function formatBytes(bytes) {
+            if (!bytes || isNaN(bytes) || bytes <= 0) return '';
+            const gb = bytes / (1024 * 1024 * 1024);
+            if (gb >= 1) return gb.toFixed(2) + ' GB';
+            const mb = bytes / (1024 * 1024);
+            if (mb >= 1) return mb.toFixed(1) + ' MB';
+            return (bytes / 1024).toFixed(0) + ' KB';
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        }
+
+        const mediaFileInfo = {
+            title: '',
+            format: '',
+            resolution: '',
+            codecVideo: 'Hardware Accelerated Native',
+            codecAudio: 'AAC Stereo',
+            audioLangs: '',
+            audioCount: 1,
+            subTracks: [],
+            fileSize: '',
+            duration: '',
+            streamMode: 'Direct HTTP Range Stream'
+        };
+
         let delayedPlayingCheckTimer = null;
 
-        function showAudioHudToast(label) {
-            const el = $('audioHudBadge'), txt = $('audioHudText');
-            if (!el || !txt) return;
-            const text = label || currentAudioSummary || 'Audio Active';
-            txt.textContent = text.startsWith('Audio:') ? text : `Audio: ${text}`;
-            el.classList.add('show');
-            clearTimeout(audioToastTimer);
-            audioToastTimer = setTimeout(() => {
-                el.classList.remove('show');
-            }, 3000);
+        function updateMediaInfoDisplay() {
+            const grid = $('mediaInfoGrid');
+            if (!grid) return;
+
+            const curTitle = (movieName.textContent || '').trim();
+            if (curTitle && curTitle !== 'Loading…' && curTitle !== 'Loading title…' && !isOpaqueId(curTitle)) {
+                mediaFileInfo.title = curTitle;
+            } else if (streamUrl) {
+                mediaFileInfo.title = cleanTitleFromUrl(streamUrl);
+            }
+
+            if (video.videoWidth && video.videoHeight) {
+                const w = video.videoWidth, h = video.videoHeight;
+                const resLabel = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
+                const ratio = (w / h).toFixed(2);
+                const ratioName = Math.abs(w / h - 16 / 9) < 0.1 ? '16:9' : Math.abs(w / h - 4 / 3) < 0.1 ? '4:3' : `${ratio}:1`;
+                mediaFileInfo.resolution = `${w} × ${h} (${resLabel} · ${ratioName})`;
+
+                const drRes = $('drResBadge');
+                if (drRes) {
+                    drRes.innerHTML = `<span class="dot"></span> ${resLabel}`;
+                    drRes.classList.add('show');
+                }
+            }
+
+            if (video.duration && isFinite(video.duration) && video.duration > 0) {
+                const d = Math.round(video.duration);
+                const hrs = Math.floor(d / 3600);
+                const mins = Math.floor((d % 3600) / 60);
+                const secs = d % 60;
+                mediaFileInfo.duration = hrs > 0
+                    ? `${hrs}h ${mins}m ${secs}s`
+                    : `${mins}m ${secs}s`;
+            }
+
+            if (!mediaFileInfo.format && streamUrl) {
+                const lower = streamUrl.toLowerCase();
+                if (lower.includes('.mkv')) mediaFileInfo.format = 'Matroska (MKV)';
+                else if (lower.includes('.mp4')) mediaFileInfo.format = 'MPEG-4 (MP4)';
+                else if (lower.includes('.webm')) mediaFileInfo.format = 'WebM Video';
+                else if (lower.includes('.m3u8')) mediaFileInfo.format = 'HLS Stream';
+            }
+
+            const drFmt = $('drFormatBadge');
+            if (drFmt) {
+                if (mediaFileInfo.format) {
+                    const shortFmt = mediaFileInfo.format.includes('MKV') ? 'MKV' : mediaFileInfo.format.includes('MP4') ? 'MP4' : mediaFileInfo.format.includes('WebM') ? 'WEBM' : 'STREAM';
+                    drFmt.textContent = shortFmt;
+                    drFmt.classList.add('show');
+                } else {
+                    drFmt.classList.remove('show');
+                }
+            }
+
+            const drSz = $('drSizeBadge');
+            if (drSz) {
+                if (mediaFileInfo.fileSize) {
+                    drSz.textContent = mediaFileInfo.fileSize;
+                    drSz.classList.add('show');
+                } else {
+                    drSz.classList.remove('show');
+                }
+            }
+
+            mediaFileInfo.streamMode = useProxy ? 'Cloudflare Proxy Stream' : 'Direct HTTP Range Stream';
+
+            const rows = [];
+            if (mediaFileInfo.title) rows.push(['Filename / Title', mediaFileInfo.title]);
+            if (mediaFileInfo.format) rows.push(['Container Format', mediaFileInfo.format]);
+            if (mediaFileInfo.resolution) rows.push(['Resolution', mediaFileInfo.resolution]);
+            if (mediaFileInfo.duration) rows.push(['Duration', mediaFileInfo.duration]);
+            if (mediaFileInfo.codecAudio) rows.push(['Audio Codec', mediaFileInfo.codecAudio]);
+            if (mediaFileInfo.audioLangs) rows.push(['Audio Languages', mediaFileInfo.audioLangs]);
+            if (mediaFileInfo.audioCount > 1) rows.push(['Audio Streams', `${mediaFileInfo.audioCount} Tracks`]);
+            if (mediaFileInfo.subTracks && mediaFileInfo.subTracks.length > 0) {
+                const subNames = mediaFileInfo.subTracks.map(s => s.lang || s.name || 'Subtitle').join(', ');
+                rows.push(['Subtitles', subNames]);
+            }
+            if (mediaFileInfo.fileSize) rows.push(['File Size', mediaFileInfo.fileSize]);
+            rows.push(['Delivery Protocol', mediaFileInfo.streamMode]);
+
+            if (rows.length === 0) {
+                grid.innerHTML = '<div class="media-info-loading"><span class="dot-pulse"></span> Streaming video metadata…</div>';
+                return;
+            }
+
+            grid.innerHTML = rows.map(([lbl, val]) => `
+                <div class="media-info-row">
+                    <span class="media-info-label">${escapeHtml(lbl)}</span>
+                    <span class="media-info-val" title="${escapeHtml(val)}">${escapeHtml(val)}</span>
+                </div>
+            `).join('');
         }
 
         function loadStream(url, tryAutoPlay = true) {
@@ -3182,10 +3317,7 @@
             advanceLoader();
             showSpinner();
             metadataInspected = false;
-            hasShownAudioToast = false;
             clearTimeout(delayedPlayingCheckTimer);
-            clearTimeout(audioToastTimer);
-            if ($('audioHudBadge')) $('audioHudBadge').classList.remove('show');
 
             // Show player stage controls and hide landing screen
             const landing = $('landingScreen');
@@ -3200,7 +3332,8 @@
             $('titleBar').style.display = 'flex';
             $('controls').style.display = 'flex';
             centerIcon.style.display = 'flex';
-            if ($('titleResBadge')) $('titleResBadge').classList.remove('show');
+            if ($('drResBadge')) $('drResBadge').classList.remove('show');
+            if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
             if (errBox) errBox.style.display = 'none';
             updateTimeLabel();
 
@@ -3232,8 +3365,7 @@
             };
             video.addEventListener('loadedmetadata', onMeta, { once: true });
 
-            // 7. Schedule non-blocking background metadata inspection
-            scheduleMetadataInspection(effectiveSrc);
+            updateMediaInfoDisplay();
 
             // Initial state: show spinner while buffering stream
             showSpinner();
@@ -3279,7 +3411,8 @@
             $('controls').style.display = 'none';
             centerIcon.style.display = 'none';
             hideSpinner(true);
-            if ($('titleResBadge')) $('titleResBadge').classList.remove('show');
+            if ($('drResBadge')) $('drResBadge').classList.remove('show');
+            if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
             try {
                 video.pause();
                 video.removeAttribute('src');
@@ -3572,16 +3705,15 @@
         }
 
         function updateResolutionBadge() {
-            const b1 = $('titleResBadge'), b2 = $('drResBadge');
+            const b = $('drResBadge');
             if (video.videoHeight && video.videoHeight > 0) {
                 const h = video.videoHeight;
                 const label = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
-                [b1, b2].forEach(b => {
-                    if (b) {
-                        b.innerHTML = `<span class="dot"></span> ${label}`;
-                        b.classList.add('show');
-                    }
-                });
+                if (b) {
+                    b.innerHTML = `<span class="dot"></span> ${label}`;
+                    b.classList.add('show');
+                }
+                updateMediaInfoDisplay();
             }
         }
 
@@ -3833,6 +3965,13 @@
                 const sec = $(row.dataset.expand);
                 const open = sec.classList.toggle('open');
                 row.classList.toggle('expanded', open);
+                if (open && row.dataset.expand === 'secAudio') {
+                    if (!metadataInspected && streamUrl) {
+                        metadataInspected = true;
+                        inspectMediaMetadata(streamUrl);
+                    }
+                    updateMediaInfoDisplay();
+                }
             }));
 
         /* external links */
@@ -4253,18 +4392,22 @@
                 ? `<span class="dot"></span> ${audioTracks.length} Audios (${audioLangs.slice(0, 2).join(', ')})`
                 : `<span class="dot"></span> ${audioTracks[0]?.codec || 'AAC'} ${audioTracks[0]?.channels || 'Stereo'}`;
 
-            currentAudioSummary = audioTracks.length > 1
-                ? `${audioTracks.length} Audios (${audioLangs.slice(0, 3).join(', ')})`
-                : `${audioTracks[0]?.lang ? audioTracks[0].lang + ' · ' : ''}${audioTracks[0]?.codec || 'AAC'} ${audioTracks[0]?.channels || 'Stereo'}`;
+            // Update Media info drawer audio badge
+            const drBadge = $('drAudioBadge');
+            if (drBadge) {
+                drBadge.innerHTML = badgeHtml;
+                drBadge.classList.add('show');
+            }
 
-            // Update prominent titleBar audio badge AND drawer audio badge
-            [$('titleAudioBadge'), $('drAudioBadge')].forEach(b => {
-                if (b) {
-                    b.innerHTML = badgeHtml;
-                    b.classList.add('show');
-                    b.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
-                }
-            });
+            mediaFileInfo.audioTracks = audioTracks;
+            mediaFileInfo.subTracks = subTracks;
+            mediaFileInfo.audioCount = audioTracks.length;
+            mediaFileInfo.audioLangs = audioLangs.join(', ');
+            if (audioTracks[0]) {
+                const a0 = audioTracks[0];
+                mediaFileInfo.codecAudio = [a0.codec, a0.channels].filter(Boolean).join(' ') || 'AAC Stereo';
+            }
+            updateMediaInfoDisplay();
 
             audioTracks.forEach((t, i) => {
                 const item = document.createElement('div');
@@ -4345,15 +4488,17 @@
                 if (dlBadge) dlBadge.textContent = `${at.length} audios`;
                 if (dlSummary) dlSummary.innerHTML = `<strong>Includes:</strong> ${names.join(', ')}`;
 
-                currentAudioSummary = `${at.length} Audios (${names.slice(0, 2).join(', ')})`;
                 const badgeHtml = `<span class="dot"></span> ${at.length} Audios (${names.slice(0, 2).join(', ')})`;
-                [$('titleAudioBadge'), $('drAudioBadge')].forEach(b => {
-                    if (b) {
-                        b.innerHTML = badgeHtml;
-                        b.classList.add('show');
-                        b.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
-                    }
-                });
+                const drBadge = $('drAudioBadge');
+                if (drBadge) {
+                    drBadge.innerHTML = badgeHtml;
+                    drBadge.classList.add('show');
+                }
+
+                mediaFileInfo.audioCount = at.length;
+                mediaFileInfo.audioLangs = names.join(', ');
+                mediaFileInfo.codecAudio = 'Browser Native Multi-Audio';
+                updateMediaInfoDisplay();
             } else {
                 // Render the active primary audio stream card
                 const item = document.createElement('div');
@@ -4375,15 +4520,16 @@
                 if (dlBadge) dlBadge.textContent = 'Audio included';
                 if (dlSummary) dlSummary.innerHTML = '<strong>Includes:</strong> Original Stream Audio (Stereo / Multi-channel)';
 
-                currentAudioSummary = 'AAC Stereo';
                 const badgeHtml = `<span class="dot"></span> AAC Stereo`;
-                [$('titleAudioBadge'), $('drAudioBadge')].forEach(b => {
-                    if (b) {
-                        b.innerHTML = badgeHtml;
-                        b.classList.add('show');
-                        b.onclick = e => { e.stopPropagation(); openDrawer(); const s = $('secAudio'); if (s) s.classList.add('open'); };
-                    }
-                });
+                const drBadge = $('drAudioBadge');
+                if (drBadge) {
+                    drBadge.innerHTML = badgeHtml;
+                    drBadge.classList.add('show');
+                }
+
+                mediaFileInfo.audioCount = 1;
+                mediaFileInfo.codecAudio = 'AAC Stereo';
+                updateMediaInfoDisplay();
             }
         }
 
@@ -4415,6 +4561,12 @@
                         }
                     }
 
+                    const cl = head.headers.get('Content-Length');
+                    if (cl) {
+                        const bytes = parseInt(cl, 10);
+                        if (!isNaN(bytes) && bytes > 0) mediaFileInfo.fileSize = formatBytes(bytes);
+                    }
+
                     const xTracks = head.headers.get('X-Audio-Tracks') || head.headers.get('X-Media-Tracks');
                     if (xTracks) {
                         const items = xTracks.split(',').map(s => ({ type: 'audio', name: s.trim(), codec: 'Audio', channels: '' }));
@@ -4444,8 +4596,19 @@
                             }
                         }
 
+                        const cr = res.headers.get('Content-Range');
+                        const cl = res.headers.get('Content-Length');
+                        if (cr && cr.includes('/')) {
+                            const total = parseInt(cr.split('/')[1], 10);
+                            if (!isNaN(total) && total > 0) mediaFileInfo.fileSize = formatBytes(total);
+                        } else if (cl) {
+                            const bytes = parseInt(cl, 10);
+                            if (!isNaN(bytes) && bytes > 524288) mediaFileInfo.fileSize = formatBytes(bytes);
+                        }
+
                         const buf = new Uint8Array(await res.arrayBuffer());
                         if (buf.length > 16 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
+                            mediaFileInfo.format = 'Matroska (MKV)';
                             // Scan embedded MKV title
                             const ebmlTitle = parseEbmlTitle(buf);
                             if (ebmlTitle && !isOpaqueId(ebmlTitle)) {
@@ -4465,6 +4628,7 @@
                         }
                         const mp4Tracks = parseMp4Tracks(buf);
                         if (mp4Tracks && mp4Tracks.length > 0) {
+                            mediaFileInfo.format = 'MPEG-4 (MP4)';
                             renderMediaTracks(mp4Tracks);
                             return;
                         }
@@ -4955,7 +5119,7 @@
 
             // Perform delayed verification after a few seconds of playback (2.4s):
             // 1. If stream title is still generic/opaque/loading, re-fetch via deep range request & proxy
-            // 2. Ensure audio metadata is inspected and flash the audio HUD toast capsule
+            // 2. Ensure media metadata is inspected for Media info
             clearTimeout(delayedPlayingCheckTimer);
             delayedPlayingCheckTimer = setTimeout(() => {
                 if (video.paused) return;
@@ -4970,12 +5134,6 @@
                 if (!metadataInspected && streamUrl) {
                     metadataInspected = true;
                     inspectMediaMetadata(streamUrl);
-                }
-
-                // 3. Display audio metadata toast once per stream playback session
-                if (!hasShownAudioToast) {
-                    hasShownAudioToast = true;
-                    showAudioHudToast(currentAudioSummary);
                 }
             }, 2400);
         });
