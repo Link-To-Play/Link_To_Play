@@ -94,7 +94,7 @@ export default {
                 outHeaders.set('Access-Control-Allow-Origin', '*');
                 outHeaders.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
                 outHeaders.set('Access-Control-Allow-Headers', 'Range, Content-Type, Authorization, X-Requested-With');
-                outHeaders.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type, X-Proxy-Upstream-Status');
+                outHeaders.set('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges, Content-Type, Content-Disposition, X-Proxy-Upstream-Status');
 
                 return new Response(upstreamRes.body, {
                     status: upstreamRes.status,
