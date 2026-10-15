@@ -8868,6 +8868,20 @@ fn fs() -> @location(0) vec4<f32> {
   };
 
   /* --------------------------------------------------
+   *  Public helper: Pause & Resume GPU rendering when UI is hidden
+   * ------------------------------------------------*/
+  window.liquidGL.pause = function () {
+    if (renderRaf !== null) {
+      cancelAnimationFrame(renderRaf);
+      renderRaf = null;
+    }
+  };
+
+  window.liquidGL.resume = function () {
+    startRendering();
+  };
+
+  /* --------------------------------------------------
    *  Public helper: Universal smooth scroll / animation sync
    * ------------------------------------------------*/
   window.liquidGL.syncWith = function (config = {}) {

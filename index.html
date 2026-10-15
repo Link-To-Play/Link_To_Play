@@ -292,7 +292,7 @@
             transition: opacity 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
-        #controls.liquidgl-active {
+        .liquidgl-lens.liquidgl-active {
             background: transparent !important;
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
@@ -301,10 +301,19 @@
             pointer-events: auto !important;
         }
 
-        #controls > * {
+        .liquidgl-lens.liquidgl-active > * {
             position: relative;
             z-index: 2;
             pointer-events: auto !important;
+        }
+
+        /* Smart GPU canvas visibility: hide canvas when UI hides */
+        canvas[data-liquid-ignore] {
+            transition: opacity 0.35s ease;
+        }
+        #stage.hide-ui canvas[data-liquid-ignore] {
+            opacity: 0 !important;
+            pointer-events: none !important;
         }
 
         #stage.hide-ui {
@@ -1055,6 +1064,7 @@
         #stage.layout-mobile #timeRemaining { order: 4; font-size: 11.5px; font-weight: 600; margin-right: auto; }
         #stage.layout-mobile #volWrap { display: none !important; }
         #stage.layout-mobile #pipBtn { display: none !important; }
+        #stage.layout-mobile #audioBtn { order: 5; padding: 4px 6px; }
         #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
         #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
         #stage.layout-mobile #fsBtn { order: 8; padding: 4px 0 4px 6px; }
@@ -1087,6 +1097,7 @@
         #stage.layout-tablet #timeRemaining { order: unset; font-size: 11.5px; margin-right: 0; }
         #stage.layout-tablet #volWrap { display: none !important; }
         #stage.layout-tablet #pipBtn { display: none !important; }
+        #stage.layout-tablet #audioBtn { order: unset; }
         #stage.layout-tablet #aspectBtn { order: unset; }
         #stage.layout-tablet #setBtn { order: unset; }
         #stage.layout-tablet #fsBtn { order: unset; }
@@ -1120,6 +1131,7 @@
         #stage.layout-desktop #timeRemaining { order: unset; font-size: 12.5px; font-weight: 500; margin-right: 0; }
         #stage.layout-desktop #volWrap { display: flex !important; order: unset; }
         #stage.layout-desktop #pipBtn { display: flex !important; order: unset; }
+        #stage.layout-desktop #audioBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #aspectBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #setBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #fsBtn { order: unset; padding: 6px; }
@@ -2435,6 +2447,22 @@
             font-weight: 400;
         }
 
+        @media (max-width: 768px) {
+            .media-info-grid {
+                margin: 4px 8px 12px;
+                padding: 10px 10px;
+                gap: 10px;
+            }
+            .mi-line {
+                font-size: 11px;
+                padding: 6px 8px;
+                min-height: 34px;
+            }
+            .mi-item-name {
+                font-size: 11.5px;
+            }
+        }
+
         #audioPills {
             display: flex;
             flex-direction: column;
@@ -2609,11 +2637,12 @@
                 <path id="centerPath" d="M8 5v14l11-7z" />
             </svg></div>
 
-        <div id="titleBar">
+        <div id="titleBar" class="liquidgl-lens">
             <div class="title-header">
                 <div class="title-identity">
                     <span class="accent"></span>
                     <span class="name" id="movieName">Loading…</span>
+                    <span class="title-audio-badge" id="titleAudioBadge"></span>
                 </div>
             </div>
             <button class="title-action-btn" id="titleReloadBtn" title="Reload player" aria-label="Reload player">
@@ -2691,7 +2720,7 @@
         </div>
 
         <!-- ============ CAPSULE HUD PILL (Volume & Brightness) ============ -->
-        <div id="capsuleHud" class="capsule-hud">
+        <div id="capsuleHud" class="capsule-hud liquidgl-lens">
             <div class="ch-layer ch-base">
                 <svg class="ch-icon" viewBox="0 0 24 24"><path id="chIconBase" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
                 <span class="ch-pct" id="chPctBase">100%</span>
@@ -2704,7 +2733,7 @@
             </div>
         </div>
 
-        <div id="controls">
+        <div id="controls" class="liquidgl-lens">
             <!-- 1. Play / Pause -->
             <button class="ctl-btn" id="playBtn" aria-label="Play/Pause">
                 <svg id="icoPlay" viewBox="0 0 24 24">
@@ -2764,14 +2793,21 @@
                 </svg>
             </button>
 
-            <!-- 8. Settings -->
+            <!-- 8. Audio Tracks Quick Selector -->
+            <button class="ctl-btn" id="audioBtn" aria-label="Audio Tracks" title="Audio Tracks & Languages">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                </svg>
+            </button>
+
+            <!-- 9. Settings -->
             <button class="ctl-btn" id="setBtn" aria-label="Settings" title="Settings">
                 <svg viewBox="0 0 24 24">
                     <path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.5 7.5 0 0 0-1.7-1L14.5 2.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5L9.2 5a7.5 7.5 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1a7.5 7.5 0 0 0 1.7 1l.3 2.6c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.3-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
                 </svg>
             </button>
 
-            <!-- 9. Fullscreen -->
+            <!-- 10. Fullscreen -->
             <button class="ctl-btn" id="fsBtn" aria-label="Fullscreen" title="Fullscreen (F)">
                 <svg id="icoFsEnter" viewBox="0 0 24 24">
                     <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -2786,7 +2822,7 @@
 
         <!-- ============ SETTINGS DRAWER (inside stage = fullscreen-safe) ============ -->
         <div id="drawerOverlay"></div>
-        <aside id="settingsDrawer">
+        <aside id="settingsDrawer" class="liquidgl-lens">
             <div class="dr-head">
                 <h3>Settings</h3>
                 <button class="dr-close" id="drawerClose">✕</button>
@@ -2984,7 +3020,7 @@
 
         <!-- ============ VLC MODAL (inside stage = fullscreen-safe) ============ -->
         <div class="modal-overlay" id="vlcModal">
-            <div class="modal">
+            <div class="modal liquidgl-lens">
                 <button class="modal-close" data-close="vlcModal">✕</button>
                 <h3>Open in VLC</h3>
                 <ol id="vlcSteps"></ol>
@@ -3344,6 +3380,11 @@
                 drAudio.innerHTML = `<span class="dot"></span> ${count > 1 ? count + ' Audios' : '1 Audio'}`;
                 drAudio.classList.add('show');
             }
+            const titleAudio = $('titleAudioBadge');
+            if (titleAudio) {
+                titleAudio.innerHTML = `<span class="dot"></span> ${count > 1 ? count + ' Audios' : '1 Audio'}`;
+                titleAudio.classList.add('show');
+            }
 
             // Audio tracks formatting (purely informational, marking default audio stream)
             let audioHtml = '';
@@ -3462,6 +3503,7 @@
             centerIcon.style.display = 'flex';
             if ($('drResBadge')) $('drResBadge').classList.remove('show');
             if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
+            if ($('titleAudioBadge')) $('titleAudioBadge').classList.remove('show');
             if (errBox) errBox.style.display = 'none';
             updateTimeLabel();
 
@@ -3541,6 +3583,7 @@
             hideSpinner(true);
             if ($('drResBadge')) $('drResBadge').classList.remove('show');
             if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
+            if ($('titleAudioBadge')) $('titleAudioBadge').classList.remove('show');
             try {
                 video.pause();
                 video.removeAttribute('src');
@@ -3609,37 +3652,50 @@
         }
 
         function updateFsIcon() {
-            const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+            const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || (video && video.webkitDisplayingFullscreen));
             if ($('icoFsEnter')) $('icoFsEnter').style.display = isFs ? 'none' : 'block';
             if ($('icoFsExit')) $('icoFsExit').style.display = isFs ? 'block' : 'none';
         }
 
         function toggleFullscreen() {
-            if (document.fullscreenElement || document.webkitFullscreenElement) {
+            const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement || (video && video.webkitDisplayingFullscreen));
+            if (isFs) {
                 if (document.exitFullscreen) document.exitFullscreen().catch(() => { });
                 else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            } else {
-                const target = stage || document.documentElement;
-                const req = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen || target.msRequestFullscreen;
-                if (req) {
-                    try {
-                        const p = req.call(target);
-                        if (p && p.then) {
-                            p.then(lockLandscape).catch(() => {
-                                if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
-                                else if (document.documentElement.requestFullscreen) {
-                                    document.documentElement.requestFullscreen().catch(() => { });
-                                }
-                            });
-                        }
-                    } catch (e) {
-                        if (video.webkitEnterFullscreen) video.webkitEnterFullscreen();
-                    }
-                } else if (video.webkitEnterFullscreen) {
+                else if (video && video.webkitExitFullscreen) video.webkitExitFullscreen();
+                return;
+            }
+
+            // On iPhone / iOS Safari, Element.requestFullscreen is not supported on containers. Direct video.webkitEnterFullscreen is required!
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            if (isIOS && video && video.webkitEnterFullscreen && !stage.requestFullscreen) {
+                try {
                     video.webkitEnterFullscreen();
-                } else if (document.documentElement.requestFullscreen) {
-                    document.documentElement.requestFullscreen().catch(() => { });
+                    return;
+                } catch (e) { }
+            }
+
+            const target = stage || document.documentElement;
+            const req = target.requestFullscreen || target.webkitRequestFullscreen || target.mozRequestFullScreen || target.msRequestFullscreen;
+            if (req) {
+                try {
+                    const p = req.call(target);
+                    if (p && p.then) {
+                        p.then(lockLandscape).catch(() => {
+                            if (video && video.webkitEnterFullscreen) {
+                                try { video.webkitEnterFullscreen(); } catch (_) { }
+                            }
+                        });
+                    }
+                } catch (e) {
+                    if (video && video.webkitEnterFullscreen) {
+                        try { video.webkitEnterFullscreen(); } catch (_) { }
+                    }
                 }
+            } else if (video && video.webkitEnterFullscreen) {
+                try { video.webkitEnterFullscreen(); } catch (_) { }
+            } else if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen().catch(() => { });
             }
         }
 
@@ -3655,11 +3711,20 @@
             if (document.webkitFullscreenElement) lockLandscape();
             updateFsIcon();
         });
+        if (video) {
+            video.addEventListener('webkitbeginfullscreen', updateFsIcon);
+            video.addEventListener('webkitendfullscreen', updateFsIcon);
+        }
 
         const fsBtn = $('fsBtn');
         if (fsBtn) {
             fsBtn.addEventListener('click', e => {
                 e.stopPropagation();
+                toggleFullscreen();
+            });
+            fsBtn.addEventListener('touchend', e => {
+                e.stopPropagation();
+                e.preventDefault();
                 toggleFullscreen();
             });
         }
@@ -4077,6 +4142,33 @@
             drawerOverlay.classList.remove('open');
         }
         setBtn.addEventListener('click', e => { e.stopPropagation(); openDrawer(); });
+        const audioBtn = $('audioBtn');
+        if (audioBtn) {
+            audioBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                openDrawer();
+                const audioRow = document.querySelector('[data-expand="secAudio"]');
+                const secAudio = $('secAudio');
+                if (audioRow && secAudio) {
+                    audioRow.classList.add('expanded');
+                    secAudio.classList.add('open');
+                    if (!metadataInspected && streamUrl) {
+                        metadataInspected = true;
+                        inspectMediaMetadata(streamUrl);
+                    }
+                    updateMediaInfoDisplay();
+                    setTimeout(() => secAudio.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+                }
+            });
+        }
+        const titleAudioBadge = $('titleAudioBadge');
+        if (titleAudioBadge) {
+            titleAudioBadge.addEventListener('click', e => {
+                e.stopPropagation();
+                if (audioBtn) audioBtn.click();
+                else openDrawer();
+            });
+        }
         $('drawerClose').addEventListener('click', closeDrawer);
         drawerOverlay.addEventListener('click', closeDrawer);
         document.addEventListener('keydown', e => {
@@ -4190,15 +4282,15 @@
             if (liquidGlassLens) return;
 
             try {
-                const controlsEl = $('controls');
-                if (!controlsEl) return;
-                controlsEl.classList.add('liquidgl-active');
+                const lensEls = document.querySelectorAll('.liquidgl-lens');
+                if (!lensEls.length) return;
+                lensEls.forEach(el => el.classList.add('liquidgl-active'));
 
-                // Resolution: 1.0 on mobile to guarantee smooth 60fps with zero battery drain, 1.5 on desktop
-                const res = isMobileScreen ? 1.0 : 1.5;
+                // Resolution: 1.0 on mobile to guarantee smooth 60fps with zero battery drain, 1.4 on desktop
+                const res = isMobileScreen ? 1.0 : 1.4;
 
                 liquidGlassLens = window.liquidGL({
-                    target: '#controls',
+                    target: '.liquidgl-lens',
                     snapshot: '#stage',
                     resolution: res,
                     refraction: 0.02,
@@ -4223,15 +4315,14 @@
         }
 
         function destroyLiquidGlass() {
-            const controlsEl = $('controls');
-            if (controlsEl) controlsEl.classList.remove('liquidgl-active');
+            document.querySelectorAll('.liquidgl-lens').forEach(el => el.classList.remove('liquidgl-active'));
 
             if (liquidGlassLens) {
                 try {
-                    if (typeof liquidGlassLens.destroy === 'function') {
+                    if (Array.isArray(liquidGlassLens)) {
+                        liquidGlassLens.forEach(l => { try { l?.destroy?.(); } catch (_) { } });
+                    } else if (typeof liquidGlassLens.destroy === 'function') {
                         liquidGlassLens.destroy();
-                    } else if (Array.isArray(liquidGlassLens) && liquidGlassLens[0]?.destroy) {
-                        liquidGlassLens[0].destroy();
                     }
                 } catch (e) { }
                 liquidGlassLens = null;
@@ -5242,12 +5333,17 @@
         let isMouseOverUI = false;
         const titleBar = $('titleBar'), controls = $('controls');
 
-        function onEnterUI() {
+        function onEnterUI(e) {
+            if (e && (e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents))) return;
+            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
             isMouseOverUI = true;
             stage.classList.remove('hide-ui');
+            if (window.liquidGL && window.liquidGL.resume) window.liquidGL.resume();
             clearTimeout(wakeUI.t);
         }
-        function onLeaveUI() {
+        function onLeaveUI(e) {
+            if (e && (e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents))) return;
+            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
             isMouseOverUI = false;
             wakeUI();
         }
@@ -5255,28 +5351,40 @@
         if (controls) {
             controls.addEventListener('mouseenter', onEnterUI);
             controls.addEventListener('mouseleave', onLeaveUI);
-            controls.addEventListener('pointerdown', () => { wakeUI(4000); });
+            controls.addEventListener('pointerdown', (e) => {
+                if (e && e.pointerType === 'touch') isMouseOverUI = false;
+                wakeUI(4000);
+            });
         }
         if (titleBar) {
             titleBar.addEventListener('mouseenter', onEnterUI);
             titleBar.addEventListener('mouseleave', onLeaveUI);
-            titleBar.addEventListener('pointerdown', () => { wakeUI(4000); });
+            titleBar.addEventListener('pointerdown', (e) => {
+                if (e && e.pointerType === 'touch') isMouseOverUI = false;
+                wakeUI(4000);
+            });
         }
 
         function wakeUI(duration = 3500) {
             stage.classList.remove('hide-ui');
+            if (window.liquidGL && window.liquidGL.resume) window.liquidGL.resume();
             clearTimeout(wakeUI.t);
             if (!video.paused && !isMouseOverUI) {
                 wakeUI.t = setTimeout(() => {
                     if (!stage.classList.contains('mouse-near-bottom') && !isMouseOverUI) {
                         stage.classList.add('hide-ui');
                         volWrap.classList.remove('open');
+                        if (window.liquidGL && window.liquidGL.pause) window.liquidGL.pause();
                     }
                 }, duration);
             }
         }
         video.addEventListener('play', () => wakeUI(3500));
-        video.addEventListener('pause', () => { stage.classList.remove('hide-ui'); clearTimeout(wakeUI.t); });
+        video.addEventListener('pause', () => {
+            stage.classList.remove('hide-ui');
+            if (window.liquidGL && window.liquidGL.resume) window.liquidGL.resume();
+            clearTimeout(wakeUI.t);
+        });
 
         /* Bottom hover / mouse movement triggers top and bottom UI (Desktop only) */
         stage.addEventListener('mousemove', e => {
@@ -5415,6 +5523,7 @@
                                 /* Tap to hide: dismiss immediately */
                                 stage.classList.add('hide-ui');
                                 clearTimeout(wakeUI.t);
+                                if (window.liquidGL && window.liquidGL.pause) window.liquidGL.pause();
                             }
                         } else {
                             /* Desktop mouse click: wakes UI and toggles play/pause */
