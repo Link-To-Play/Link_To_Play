@@ -46,6 +46,19 @@
             /* we own all gestures */
             user-select: none;
             -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        #stage,
+        #stage * {
+            -webkit-touch-callout: none !important;
+        }
+
+        #landingScreen,
+        #landingScreen * {
+            -webkit-touch-callout: default !important;
+            -webkit-user-select: auto !important;
+            user-select: auto !important;
         }
 
         /* ============ ASPECT RATIO & SCREEN FIT ============ */
@@ -53,6 +66,10 @@
             width: 100%;
             height: 100%;
             object-fit: contain;
+            pointer-events: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
             transition: width 0.15s ease, height 0.15s ease, max-width 0.15s ease, max-height 0.15s ease;
         }
 
@@ -3556,6 +3573,7 @@
         });
         /* capsule track: click or drag sets volume (pointer capture keeps the
            drag alive if the finger strays off the thin rail) */
+        let isControlHubChangingVolume = false;
         function volFromEvent(e) {
             const r = volTrack.getBoundingClientRect();
             return Math.max(0, Math.min(100, (1 - (e.clientY - r.top) / r.height) * 100));
@@ -3563,17 +3581,42 @@
         volTrack.addEventListener('pointerdown', e => {
             e.stopPropagation();
             volTrack.setPointerCapture(e.pointerId);
+            isControlHubChangingVolume = true;
             const v = volFromEvent(e);
             setVolume(v);
         });
         volTrack.addEventListener('pointermove', e => {
             if (e.buttons) {
+                isControlHubChangingVolume = true;
                 const v = volFromEvent(e);
                 setVolume(v);
             }
         });
+        volTrack.addEventListener('pointerup', () => {
+            setTimeout(() => { isControlHubChangingVolume = false; }, 80);
+        });
+        volTrack.addEventListener('pointercancel', () => {
+            setTimeout(() => { isControlHubChangingVolume = false; }, 80);
+        });
         document.addEventListener('click', e => { if (!volWrap.contains(e.target)) volWrap.classList.remove('open'); });
         setVolume(100);
+
+        /* Native volume change listener (fires on hardware buttons, media keys, bluetooth devices) */
+        video.addEventListener('volumechange', () => {
+            if (isControlHubChangingVolume) return;
+            const pct = video.muted ? 0 : Math.round(video.volume * 100);
+            volFill.style.height = pct + '%';
+            volThumb.style.bottom = pct + '%';
+            volPct.textContent = pct;
+            const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
+            $('icoVol').innerHTML = `<path d="${p}"/>`;
+            volPopIcon.innerHTML = `<path d="${p}"/>`;
+            const edgeIco = $('icoVolEdge');
+            if (edgeIco) edgeIco.setAttribute('d', p);
+
+            // Show ONLY the sleek volume capsule HUD, keep the main player UI hidden
+            triggerVolHud(pct);
+        });
 
         /* ================= SETTINGS DRAWER ================= */
         function openModal(id) { $(id).classList.add('open'); }
@@ -4393,15 +4436,36 @@
             isMouseOverUI = false;
         });
 
+        /* Prevent native context menu on long press (prevents "Download video" dialog on mobile) */
+        function preventContextMenu(e) {
+            if (e.target && e.target.tagName === 'INPUT') return;
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+        stage.addEventListener('contextmenu', preventContextMenu, { capture: true });
+        video.addEventListener('contextmenu', preventContextMenu, { capture: true });
+        window.addEventListener('contextmenu', e => {
+            if (e.target && e.target.tagName === 'INPUT') return;
+            if (stage.contains(e.target)) {
+                e.preventDefault();
+                return false;
+            }
+        }, { capture: true });
+
         stage.addEventListener('pointerdown', e => {
-            if (inControls(e)) return;
+            if (inControls(e) || (landingScreen && landingScreen.classList.contains('show'))) return;
+            if (e.pointerType === 'touch') {
+                try { stage.setPointerCapture(e.pointerId); } catch (_) { }
+            }
             g = {
                 x0: e.clientX, y0: e.clientY, t0: Date.now(),
                 mode: null,                    /* null | 'vol' | 'bri' */
                 side: e.clientX < innerWidth / 2 ? 'L' : 'R',
                 startVol: video.volume * 100,
                 startBri: fx.bri,
-                moved: false
+                moved: false,
+                pointerId: e.pointerId
             };
             g.holdTimer = setTimeout(() => {
                 if (g && !g.moved && !g.mode) {
@@ -4412,6 +4476,9 @@
                         g.boosted = true;                /* hold while playing → 2× */
                         video.playbackRate = 2;
                         speedBadge.classList.add('show');
+                        if (navigator.vibrate) {
+                            try { navigator.vibrate(35); } catch (_) { }
+                        }
                     }
                 }
             }, HOLD_MS);
@@ -4419,6 +4486,7 @@
 
         stage.addEventListener('pointermove', e => {
             if (!g) return;
+            if (holding) return; // In 2x playback mode, stay in 2x until finger lifted
             const dx = e.clientX - g.x0, dy = e.clientY - g.y0;
             if (!g.mode && Math.abs(dy) > SWIPE_THRESH && Math.abs(dy) > Math.abs(dx) * 1.4) {
                 if (g.side === 'R') {
@@ -4448,7 +4516,12 @@
                 }
                 /* hold-from-paused keeps playing after release */
             }
-            if (g.mode) { hideHud(); g = null; return; }
+            if (g.mode) {
+                hideHud();
+                try { if (g.pointerId !== undefined) stage.releasePointerCapture(g.pointerId); } catch (_) { }
+                g = null;
+                return;
+            }
 
             const dt = Date.now() - g.t0;
             const movedFar = Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 12;
@@ -4482,10 +4555,25 @@
                     }, TAP_MS);
                 }
             }
+            try { if (g && g.pointerId !== undefined) stage.releasePointerCapture(g.pointerId); } catch (_) { }
             g = null;
         }
         stage.addEventListener('pointerup', endGesture);
-        stage.addEventListener('pointercancel', () => { if (g) { clearTimeout(g.holdTimer); if (holding) { holding = false; if (g.boosted) { video.playbackRate = normalSpeed; speedBadge.classList.remove('show'); } } hideHud(); g = null; } });
+        stage.addEventListener('pointercancel', () => {
+            if (g) {
+                clearTimeout(g.holdTimer);
+                if (holding) {
+                    holding = false;
+                    if (g.boosted) {
+                        video.playbackRate = normalSpeed;
+                        speedBadge.classList.remove('show');
+                    }
+                }
+                hideHud();
+                try { if (g.pointerId !== undefined) stage.releasePointerCapture(g.pointerId); } catch (_) { }
+                g = null;
+            }
+        });
 
         /* ================= KEYBOARD =================
            Space press  → play/pause toggle
@@ -4514,6 +4602,7 @@
                 const next = Math.min(100, current + 5);
                 setVolume(next);
                 triggerVolHud(next);
+                return; // Volume keys ONLY show volume capsule, do not wake UI
             }
             else if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -4521,6 +4610,29 @@
                 const next = Math.max(0, current - 5);
                 setVolume(next);
                 triggerVolHud(next);
+                return; // Volume keys ONLY show volume capsule, do not wake UI
+            }
+            else if (e.code === 'AudioVolumeUp' || e.key === 'AudioVolumeUp') {
+                e.preventDefault();
+                const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+                const next = Math.min(100, current + 5);
+                setVolume(next);
+                triggerVolHud(next);
+                return;
+            }
+            else if (e.code === 'AudioVolumeDown' || e.key === 'AudioVolumeDown') {
+                e.preventDefault();
+                const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+                const next = Math.max(0, current - 5);
+                setVolume(next);
+                triggerVolHud(next);
+                return;
+            }
+            else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.code === 'AudioVolumeMute' || e.key === 'AudioVolumeMute') {
+                const next = (video.muted || video.volume === 0) ? (lastVol || 100) : 0;
+                setVolume(next);
+                triggerVolHud(next);
+                return; // Mute toggle ONLY shows volume capsule, does not wake UI
             }
             else if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
                 e.preventDefault();
@@ -4530,11 +4642,6 @@
             else if (e.code === 'KeyZ' || e.code === 'KeyA' || e.key === 'z' || e.key === 'Z' || e.key === 'a' || e.key === 'A') {
                 e.preventDefault();
                 cycleFitMode();
-            }
-            else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
-                const next = (video.muted || video.volume === 0) ? (lastVol || 100) : 0;
-                setVolume(next);
-                triggerVolHud(next);
             }
             wakeUI();
         });
