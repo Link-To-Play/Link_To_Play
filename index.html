@@ -3309,7 +3309,7 @@
             const vFps = mediaFileInfo.video.fps || '24 fps';
 
             // Top drawer badges
-            const resLabel = h >= 2160 ? '4K UHD' : h >= 1080 ? '1080p FHD' : h >= 720 ? '720p HD' : `${h}p`;
+            const resLabel = (w >= 3840 || h >= 2160) ? '4K UHD' : (w >= 1900 || h >= 1000) ? '1080p FHD' : (w >= 1280 || h >= 700) ? '720p HD' : `${h}p`;
             const drRes = $('drResBadge');
             if (drRes && (video.videoHeight || mediaFileInfo.video.height)) {
                 drRes.innerHTML = `<span class="dot"></span> ${resLabel}`;
@@ -4225,13 +4225,40 @@
 
         /* ================= AUDIO & MEDIA TRACKS INSPECTOR ================= */
         const LANG_MAP = {
-            hin: 'Hindi', eng: 'English', tam: 'Tamil', tel: 'Telugu',
-            mal: 'Malayalam', kan: 'Kannada', ben: 'Bengali', mar: 'Marathi',
-            pan: 'Punjabi', urd: 'Urdu', spa: 'Spanish', fre: 'French',
-            fra: 'French', ger: 'German', deu: 'German', jpn: 'Japanese',
-            kor: 'Korean', rus: 'Russian', ita: 'Italian', por: 'Portuguese',
-            chi: 'Chinese', zho: 'Chinese', ara: 'Arabic'
+            hin: 'Hindi', hi: 'Hindi',
+            eng: 'English', en: 'English',
+            tam: 'Tamil', ta: 'Tamil',
+            tel: 'Telugu', te: 'Telugu',
+            mal: 'Malayalam', ml: 'Malayalam',
+            kan: 'Kannada', kn: 'Kannada',
+            ben: 'Bengali', bn: 'Bengali',
+            mar: 'Marathi', mr: 'Marathi',
+            pan: 'Punjabi', pa: 'Punjabi',
+            guj: 'Gujarati', gu: 'Gujarati',
+            urd: 'Urdu', ur: 'Urdu',
+            spa: 'Spanish', es: 'Spanish',
+            fre: 'French', fra: 'French', fr: 'French',
+            ger: 'German', deu: 'German', de: 'German',
+            jpn: 'Japanese', ja: 'Japanese',
+            kor: 'Korean', ko: 'Korean',
+            rus: 'Russian', ru: 'Russian',
+            ita: 'Italian', it: 'Italian',
+            por: 'Portuguese', pt: 'Portuguese',
+            chi: 'Chinese', zho: 'Chinese', zh: 'Chinese',
+            ara: 'Arabic', ar: 'Arabic'
         };
+
+        function resolveTrackLanguage(lang, name) {
+            let clean = LANG_MAP[(lang || '').toLowerCase()] || lang || '';
+            if (!clean || clean.toLowerCase() === 'und') {
+                const lower = (name || '').toLowerCase();
+                for (const [code, lName] of Object.entries(LANG_MAP)) {
+                    if (lower.includes(lName.toLowerCase())) return lName;
+                }
+            }
+            return clean || 'Audio';
+        }
+
         const CODEC_MAP = {
             'V_MPEG4/ISO/AVC': 'H.264/AVC',
             'V_MPEGH/ISO/HEVC': 'H.265/HEVC',
@@ -4310,7 +4337,64 @@
             }
         }
 
+        function findEbmlSeekTracks(buf) {
+            if (!buf || buf.length < 32) return null;
+            let segDataPos = -1;
+            for (let i = 0; i < Math.min(buf.length - 8, 8192); i++) {
+                if (buf[i] === 0x18 && buf[i + 1] === 0x53 && buf[i + 2] === 0x80 && buf[i + 3] === 0x67) {
+                    const sz = readVint(buf, i + 4);
+                    if (sz) segDataPos = i + 4 + sz.len;
+                    break;
+                }
+            }
+            if (segDataPos === -1) return null;
+
+            for (let i = 0; i < Math.min(buf.length - 8, 262144); i++) {
+                if (buf[i] === 0x11 && buf[i + 1] === 0x4d && buf[i + 2] === 0x9b && buf[i + 3] === 0x74) {
+                    let pos = i + 4;
+                    const shSz = readVint(buf, pos);
+                    if (!shSz) break;
+                    pos += shSz.len;
+                    const shEnd = Math.min(buf.length, pos + shSz.val);
+                    while (pos < shEnd - 4) {
+                        const sId = readEbmlId(buf, pos);
+                        if (!sId) break;
+                        pos += sId.len;
+                        const sSz = readVint(buf, pos);
+                        if (!sSz) break;
+                        pos += sSz.len;
+                        const sEnd = Math.min(shEnd, pos + sSz.val);
+                        if (sId.val === 0x4dbb) { // Seek entry
+                            let inner = pos, isTracks = false, seekPos = 0;
+                            while (inner < sEnd) {
+                                const iId = readEbmlId(buf, inner);
+                                if (!iId) break;
+                                inner += iId.len;
+                                const iSz = readVint(buf, inner);
+                                if (!iSz) break;
+                                inner += iSz.len;
+                                if (iId.val === 0x53ab) { // SeekID
+                                    const idVal = readUint(buf, inner, iSz.val);
+                                    if (idVal === 0x1654ae6b) isTracks = true;
+                                } else if (iId.val === 0x53ac) { // SeekPosition
+                                    seekPos = readUint(buf, inner, iSz.val);
+                                }
+                                inner += iSz.val;
+                            }
+                            if (isTracks && seekPos > 0) {
+                                return segDataPos + seekPos;
+                            }
+                        }
+                        pos = sEnd;
+                    }
+                    break;
+                }
+            }
+            return null;
+        }
+
         function parseEbmlTracks(buf) {
+            if (!buf || buf.length < 16) return null;
             let pos = -1;
             for (let i = 0; i < buf.length - 4; i++) {
                 if (buf[i] === 0x16 && buf[i + 1] === 0x54 && buf[i + 2] === 0xae && buf[i + 3] === 0x6b) {
@@ -4347,11 +4431,11 @@
                         const valEnd = Math.min(entryEnd, pos + sz.val);
 
                         if (id.val === 0x83) { // TrackType
-                            trackType = buf[pos];
+                            trackType = readUint(buf, pos, sz.val);
                         } else if (id.val === 0x86) { // CodecID
                             codecId = readAscii(buf, pos, sz.val);
-                        } else if (id.val === 0x22b59c) { // Language
-                            lang = readAscii(buf, pos, sz.val);
+                        } else if (id.val === 0x22b59c || id.val === 0x22b59d) { // Language or LanguageBCP47
+                            if (!lang) lang = readAscii(buf, pos, sz.val);
                         } else if (id.val === 0x536e) { // Name
                             name = readUtf8(buf, pos, sz.val);
                         } else if (id.val === 0x23e383) { // DefaultDuration (ns)
@@ -4380,7 +4464,7 @@
                                 const aSz = readVint(buf, aPos);
                                 if (!aSz) break;
                                 aPos += aSz.len;
-                                if (aId.val === 0x9f) channels = buf[aPos];
+                                if (aId.val === 0x9f) channels = readUint(buf, aPos, aSz.val);
                                 else if (aId.val === 0xb5) {
                                     const sr = Math.round(readFloat(buf, aPos, aSz.val));
                                     if (sr > 0) sampleRate = sr >= 1000 ? `${(sr / 1000).toFixed(sr % 1000 === 0 ? 0 : 1)} kHz` : `${sr} Hz`;
@@ -4390,9 +4474,10 @@
                         }
                         pos = valEnd;
                     }
+                    pos = entryEnd;
 
                     const cleanCodec = CODEC_MAP[codecId] || codecId.replace(/^[ASV]_/, '').replace('MPEG4/ISO/', '');
-                    const cleanLang = LANG_MAP[lang.toLowerCase()] || lang || '';
+                    const cleanLang = resolveTrackLanguage(lang, name);
                     const channelStr = channels === 6 ? '5.1' : channels === 8 ? '7.1' : channels === 1 ? 'Mono' : '2.0';
 
                     if (cleanCodec === 'E-AC-3') bitRate = channels >= 6 ? '256 kbps' : '192 kbps';
@@ -4415,7 +4500,7 @@
                             type: 'audio',
                             codecId,
                             codec: cleanCodec || 'E-AC-3',
-                            lang: cleanLang || name || 'Audio',
+                            lang: cleanLang,
                             name,
                             channels: channelStr,
                             sampleRate: sampleRate || '48 kHz',
@@ -4426,7 +4511,7 @@
                             type: 'sub',
                             codecId,
                             codec: cleanCodec || 'SRT',
-                            lang: cleanLang || name || 'English',
+                            lang: cleanLang || 'English',
                             name
                         });
                     }
@@ -4434,7 +4519,7 @@
                     pos++;
                 }
             }
-            return tracks;
+            return tracks.length > 0 ? tracks : null;
         }
 
         function parseEbmlTitle(buf) {
@@ -4532,8 +4617,7 @@
                                         const n1 = (packed >> 10) & 0x1f, n2 = (packed >> 5) & 0x1f, n3 = packed & 0x1f;
                                         if (n1 > 0 && n2 > 0 && n3 > 0) {
                                             const code = String.fromCharCode(n1 + 0x60, n2 + 0x60, n3 + 0x60);
-                                            if (LANG_MAP[code]) lang = LANG_MAP[code];
-                                            else if (code !== 'und') lang = code.toUpperCase();
+                                            lang = resolveTrackLanguage(code, '');
                                         }
                                     }
                                 } else if (mType === 'minf') {
@@ -4685,7 +4769,7 @@
                 const names = [];
                 const tracks = [];
                 Array.from(at).forEach((t, i) => {
-                    const txt = t.label || (t.language ? (LANG_MAP[t.language.toLowerCase()] || t.language.toUpperCase()) : 'Track ' + (i + 1));
+                    const txt = t.label || (t.language ? resolveTrackLanguage(t.language, '') : 'Track ' + (i + 1));
                     names.push(txt);
                     tracks.push({
                         type: 'audio',
@@ -4740,10 +4824,12 @@
 
         async function inspectMediaMetadata(url) {
             if (!url) return;
-            const targets = [url];
+            const targets = [];
+            // Prioritize proxy target to guarantee CORS and Range bypass across origins
             if (!url.startsWith('/api/proxy') && !url.includes('/api/proxy?url=')) {
                 targets.push(`/api/proxy?url=${encodeURIComponent(url)}`);
             }
+            targets.push(url);
 
             for (const target of targets) {
                 try {
@@ -4781,10 +4867,10 @@
                 } catch (e) { }
 
                 try {
-                    const rangeSignal = AbortSignal.timeout ? AbortSignal.timeout(4500) : undefined;
-                    const res = await fetch(target, { headers: { Range: 'bytes=0-524287' }, signal: rangeSignal });
+                    // Fetch first 2MB to ensure tracks header is reached
+                    const rangeSignal = AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined;
+                    const res = await fetch(target, { headers: { Range: 'bytes=0-2097151' }, signal: rangeSignal });
                     if (res.ok || res.status === 206) {
-                        // Check Content-Disposition in range GET response
                         const cd = res.headers.get('Content-Disposition') || '';
                         let filename = '';
                         const matchUtf = cd.match(/filename\*=UTF-8''([^";]+)/i);
@@ -4814,7 +4900,6 @@
                         const buf = new Uint8Array(await res.arrayBuffer());
                         if (buf.length > 16 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
                             mediaFileInfo.format = 'Matroska (MKV)';
-                            // Scan embedded MKV title
                             const ebmlTitle = parseEbmlTitle(buf);
                             if (ebmlTitle && !isOpaqueId(ebmlTitle)) {
                                 const clean = cleanTitleString(ebmlTitle);
@@ -4825,7 +4910,24 @@
                                 }
                             }
 
-                            const tracks = parseEbmlTracks(buf);
+                            let tracks = parseEbmlTracks(buf);
+                            if (!tracks) {
+                                // If Tracks element was beyond the first 2MB, discover its exact offset from SeekHead
+                                const seekOffset = findEbmlSeekTracks(buf);
+                                if (seekOffset && seekOffset > 0) {
+                                    try {
+                                        const sRes = await fetch(target, {
+                                            headers: { Range: `bytes=${seekOffset}-${seekOffset + 1048575}` },
+                                            signal: rangeSignal
+                                        });
+                                        if (sRes.ok || sRes.status === 206) {
+                                            const sBuf = new Uint8Array(await sRes.arrayBuffer());
+                                            tracks = parseEbmlTracks(sBuf);
+                                        }
+                                    } catch (errSeek) { }
+                                }
+                            }
+
                             if (tracks && tracks.length > 0) {
                                 renderMediaTracks(tracks);
                                 return;
