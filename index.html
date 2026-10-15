@@ -292,6 +292,21 @@
             transition: opacity 0.35s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
 
+        #controls.liquidgl-active {
+            background: transparent !important;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            border-color: rgba(255, 255, 255, 0.18) !important;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+            pointer-events: auto !important;
+        }
+
+        #controls > * {
+            position: relative;
+            z-index: 2;
+            pointer-events: auto !important;
+        }
+
         #stage.hide-ui {
             cursor: none;
         }
@@ -2499,7 +2514,7 @@
 <body>
 
     <div id="stage">
-        <video id="video" playsinline preload="auto"></video>
+        <video id="video" crossorigin="anonymous" playsinline preload="auto"></video>
 
         <!-- ============ LANDING SCREEN (when no ?video= is provided) ============ -->
         <div id="landingScreen">
@@ -2836,6 +2851,15 @@
                 <span class="switch"></span>
             </button>
 
+            <button class="dr-row" id="setLiquidGlass">
+                <svg viewBox="0 0 24 24">
+                    <path
+                        d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" />
+                </svg>
+                <span>✨ Liquid Glass UI</span>
+                <span class="switch"></span>
+            </button>
+
             <button class="dr-row" data-expand="secAudio">
                 <svg viewBox="0 0 24 24">
                     <path
@@ -2974,6 +2998,8 @@
         </div>
     </div>
 
+    <!-- liquidGL – Liquid Glass WebGPU/WebGL Shader Engine -->
+    <script src="liquidGL.js"></script>
     <script>
         let streamUrl = '';
         const $ = id => document.getElementById(id);
@@ -4117,6 +4143,122 @@
                 }
             });
         }
+
+        /* ============ LIQUID GLASS UI (WebGPU / WebGL Apple VisionOS Shader) ============ */
+        let liquidGlassLens = null;
+        let liquidGlassPref = null;
+        try {
+            liquidGlassPref = localStorage.getItem('stream_liquid_glass');
+        } catch (e) { }
+
+        // Mobile & device detection
+        const isMobileScreen = window.innerWidth <= 768 || ('ontouchstart' in window && window.innerWidth <= 1024);
+
+        // Auto default: ON on desktop/capable devices; on battery-saver or mobile default to ON with low GPU footprint
+        let liquidGlassEnabled = liquidGlassPref !== null ? (liquidGlassPref === 'true') : true;
+
+        function updateLiquidGlassToggle() {
+            const btn = $('setLiquidGlass');
+            if (btn) btn.classList.toggle('on', liquidGlassEnabled);
+        }
+
+        async function checkBatteryAndThrottle() {
+            if (navigator.getBattery) {
+                try {
+                    const battery = await navigator.getBattery();
+                    // If running unplugged on critically low battery (< 20%) and user hasn't explicitly forced it ON
+                    if (!battery.charging && battery.level < 0.20 && liquidGlassPref === null) {
+                        liquidGlassEnabled = false;
+                        updateLiquidGlassToggle();
+                        destroyLiquidGlass();
+                        return;
+                    }
+                    battery.addEventListener('levelchange', () => {
+                        if (!battery.charging && battery.level < 0.15 && liquidGlassEnabled && liquidGlassPref === null) {
+                            toggleLiquidGlass(false);
+                        }
+                    });
+                } catch (e) { }
+            }
+        }
+
+        function initLiquidGlass() {
+            if (!liquidGlassEnabled || typeof window.liquidGL !== 'function') {
+                destroyLiquidGlass();
+                return;
+            }
+            if (liquidGlassLens) return;
+
+            try {
+                const controlsEl = $('controls');
+                if (!controlsEl) return;
+                controlsEl.classList.add('liquidgl-active');
+
+                // Resolution: 1.0 on mobile to guarantee smooth 60fps with zero battery drain, 1.5 on desktop
+                const res = isMobileScreen ? 1.0 : 1.5;
+
+                liquidGlassLens = window.liquidGL({
+                    target: '#controls',
+                    snapshot: '#stage',
+                    resolution: res,
+                    refraction: 0.02,
+                    aberration: 0.015,     // Prismatic chromatic dispersion on curved bevel
+                    bevelDepth: 0.12,
+                    bevelWidth: 0.18,
+                    frost: 6,
+                    tint: 'rgba(12, 14, 18, 0.40)', // Ultra-sleek visionOS tinted glass
+                    shadow: true,
+                    specular: true,
+                    reveal: 'none',        // Instant reveal, no fade latency
+                    interaction: isMobileScreen ? 'none' : 'fluid', // Tactile fluid ripples on hover
+                    interactionStrength: 0.35,
+                    interactionRadius: 0.25,
+                    interactionViscosity: 0.70,
+                    engine: 'auto'
+                });
+            } catch (err) {
+                console.warn('liquidGL init failed, falling back to CSS glass:', err);
+                destroyLiquidGlass();
+            }
+        }
+
+        function destroyLiquidGlass() {
+            const controlsEl = $('controls');
+            if (controlsEl) controlsEl.classList.remove('liquidgl-active');
+
+            if (liquidGlassLens) {
+                try {
+                    if (typeof liquidGlassLens.destroy === 'function') {
+                        liquidGlassLens.destroy();
+                    } else if (Array.isArray(liquidGlassLens) && liquidGlassLens[0]?.destroy) {
+                        liquidGlassLens[0].destroy();
+                    }
+                } catch (e) { }
+                liquidGlassLens = null;
+            }
+        }
+
+        function toggleLiquidGlass(forceVal) {
+            liquidGlassEnabled = typeof forceVal === 'boolean' ? forceVal : !liquidGlassEnabled;
+            try {
+                localStorage.setItem('stream_liquid_glass', String(liquidGlassEnabled));
+            } catch (e) { }
+            updateLiquidGlassToggle();
+            if (liquidGlassEnabled) {
+                initLiquidGlass();
+            } else {
+                destroyLiquidGlass();
+            }
+        }
+
+        const setLiquidGlassBtn = $('setLiquidGlass');
+        if (setLiquidGlassBtn) {
+            updateLiquidGlassToggle();
+            setLiquidGlassBtn.addEventListener('click', () => toggleLiquidGlass());
+        }
+
+        checkBatteryAndThrottle();
+        setTimeout(initLiquidGlass, 300);
 
         /* speed pills */
         let normalSpeed = 1;
