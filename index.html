@@ -863,46 +863,54 @@
                 height: 14px;
             }
 
-            /* Controls Floating Pill Layout on Mobile */
+            /* Controls Floating Dock on Mobile (Enclosed 2-Row Layout) */
             #controls {
-                left: 10px;
-                right: 10px;
-                bottom: calc(10px + env(safe-area-inset-bottom));
-                padding: 8px 12px;
+                left: 12px;
+                right: 12px;
+                bottom: calc(12px + env(safe-area-inset-bottom));
+                width: calc(100% - 24px);
+                max-width: none;
+                height: auto !important;
+                min-height: 0;
+                padding: 6px 14px 10px;
                 border-radius: 20px;
-                gap: 6px 10px;
+                gap: 4px 8px;
                 flex-wrap: wrap;
-                background: rgba(18, 18, 20, 0.82);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border: 1px solid rgba(255, 255, 255, 0.1);
+                flex-direction: row;
+                align-items: center;
+                background: rgba(18, 18, 22, 0.88);
+                backdrop-filter: blur(24px);
+                -webkit-backdrop-filter: blur(24px);
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
             }
 
             .seek-wrap {
                 order: 1;
                 flex: 1 1 100%;
                 width: 100%;
-                height: 34px;
-                padding: 4px 0;
+                height: 28px;
+                padding: 2px 0;
                 margin-bottom: 2px;
                 touch-action: none;
             }
 
             #seek {
-                height: 5px;
+                height: 4px;
             }
 
             #seek::-webkit-slider-thumb {
-                width: 15px;
-                height: 15px;
+                width: 14px;
+                height: 14px;
             }
 
             #playBtn {
                 order: 2;
+                padding: 4px 6px 4px 0;
             }
 
             .ctl-btn {
-                padding: 4px;
+                padding: 4px 6px;
             }
 
             .ctl-btn svg {
@@ -912,33 +920,38 @@
 
             #timeCurrent {
                 order: 3;
-                font-size: 11px;
+                font-size: 11.5px;
+                font-weight: 600;
             }
 
             #timeRemaining {
                 order: 4;
-                font-size: 11px;
+                font-size: 11.5px;
+                font-weight: 600;
                 margin-right: auto;
             }
 
             #volWrap {
-                order: 5;
+                display: none !important;
             }
 
             #pipBtn {
-                display: none;
+                display: none !important;
             }
 
             #aspectBtn {
                 order: 6;
+                padding: 4px 6px;
             }
 
             #setBtn {
                 order: 7;
+                padding: 4px 6px;
             }
 
             #fsBtn {
                 order: 8;
+                padding: 4px 0 4px 6px;
             }
 
             /* Center Play Icon on Mobile */
@@ -952,6 +965,112 @@
                 height: 44px;
             }
         }
+
+        /* ============ DYNAMIC RESPONSIVE CONTROL HUB CLASSES (Video.js Architecture) ============ */
+        #stage.layout-mobile #controls {
+            left: 12px;
+            right: 12px;
+            bottom: calc(12px + env(safe-area-inset-bottom));
+            width: calc(100% - 24px);
+            max-width: none;
+            height: auto !important;
+            min-height: 0;
+            padding: 6px 14px 10px;
+            border-radius: 20px;
+            gap: 4px 8px;
+            flex-wrap: wrap;
+            flex-direction: row;
+            align-items: center;
+            background: rgba(18, 18, 22, 0.88);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.65);
+        }
+        #stage.layout-mobile .seek-wrap {
+            order: 1;
+            flex: 1 1 100%;
+            width: 100%;
+            height: 28px;
+            padding: 2px 0;
+            margin-bottom: 2px;
+            touch-action: none;
+        }
+        #stage.layout-mobile #seek { height: 4px; }
+        #stage.layout-mobile #seek::-webkit-slider-thumb { width: 14px; height: 14px; }
+        #stage.layout-mobile #playBtn { order: 2; padding: 4px 6px 4px 0; }
+        #stage.layout-mobile .ctl-btn { padding: 4px 6px; }
+        #stage.layout-mobile .ctl-btn svg { width: 20px; height: 20px; }
+        #stage.layout-mobile #timeCurrent { order: 3; font-size: 11.5px; font-weight: 600; }
+        #stage.layout-mobile #timeRemaining { order: 4; font-size: 11.5px; font-weight: 600; margin-right: auto; }
+        #stage.layout-mobile #volWrap { display: none !important; }
+        #stage.layout-mobile #pipBtn { display: none !important; }
+        #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
+        #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
+        #stage.layout-mobile #fsBtn { order: 8; padding: 4px 0 4px 6px; }
+
+        /* Tablet / Landscape Hub (Single Row Compact Floating Capsule) */
+        #stage.layout-tablet #controls {
+            left: 16px;
+            right: 16px;
+            bottom: calc(12px + env(safe-area-inset-bottom));
+            width: calc(100% - 32px);
+            max-width: none;
+            height: 44px;
+            border-radius: 9999px;
+            padding: 0 14px;
+            gap: 10px;
+            flex-wrap: nowrap;
+            flex-direction: row;
+            align-items: center;
+        }
+        #stage.layout-tablet .seek-wrap {
+            order: unset;
+            flex: 1;
+            height: 32px;
+            min-width: 60px;
+            margin: 0;
+        }
+        #stage.layout-tablet #playBtn { order: unset; }
+        #stage.layout-tablet #timeCurrent { order: unset; font-size: 11.5px; }
+        #stage.layout-tablet #timeRemaining { order: unset; font-size: 11.5px; margin-right: 0; }
+        #stage.layout-tablet #volWrap { display: none !important; }
+        #stage.layout-tablet #pipBtn { display: none !important; }
+        #stage.layout-tablet #aspectBtn { order: unset; }
+        #stage.layout-tablet #setBtn { order: unset; }
+        #stage.layout-tablet #fsBtn { order: unset; }
+
+        /* Desktop Hub (Expansive Widescreen Floating Capsule) */
+        #stage.layout-desktop #controls {
+            left: 24px;
+            right: 24px;
+            bottom: 22px;
+            width: calc(100% - 48px);
+            max-width: 1440px;
+            height: 48px;
+            border-radius: 9999px;
+            padding: 0 18px;
+            gap: 12px;
+            flex-wrap: nowrap;
+            flex-direction: row;
+        }
+        #stage.layout-desktop .seek-wrap {
+            order: unset;
+            flex: 1;
+            height: 38px;
+            min-width: 80px;
+            margin: 0;
+        }
+        #stage.layout-desktop #playBtn { order: unset; padding: 6px; }
+        #stage.layout-desktop .ctl-btn { padding: 6px; }
+        #stage.layout-desktop .ctl-btn svg { width: 22px; height: 22px; }
+        #stage.layout-desktop #timeCurrent { order: unset; font-size: 12.5px; font-weight: 500; }
+        #stage.layout-desktop #timeRemaining { order: unset; font-size: 12.5px; font-weight: 500; margin-right: 0; }
+        #stage.layout-desktop #volWrap { display: flex !important; order: unset; }
+        #stage.layout-desktop #pipBtn { display: flex !important; order: unset; }
+        #stage.layout-desktop #aspectBtn { order: unset; padding: 6px; }
+        #stage.layout-desktop #setBtn { order: unset; padding: 6px; }
+        #stage.layout-desktop #fsBtn { order: unset; padding: 6px; }
 
         /* ============ CENTER ICON — YouTube-style bare glyph ============
        Just the white play triangle / pause bars over the frame — no
@@ -4542,6 +4661,30 @@
                 showLanding();
             }
         });
+
+        /* ============ DYNAMIC RESPONSIVE CONTROL HUB (Video.js Layout Engine) ============ */
+        function updatePlayerLayout() {
+            if (!stage) return;
+            const w = stage.clientWidth || window.innerWidth;
+            const h = stage.clientHeight || window.innerHeight;
+            const isLandscape = w > h;
+
+            stage.classList.remove('layout-mobile', 'layout-tablet', 'layout-desktop');
+            if (w <= 520 || (!isLandscape && w <= 768)) {
+                stage.classList.add('layout-mobile');
+            } else if (w <= 900 || (isLandscape && h <= 520)) {
+                stage.classList.add('layout-tablet');
+            } else {
+                stage.classList.add('layout-desktop');
+            }
+        }
+
+        if (window.ResizeObserver) {
+            new ResizeObserver(updatePlayerLayout).observe(stage);
+        }
+        window.addEventListener('resize', updatePlayerLayout);
+        window.addEventListener('orientationchange', updatePlayerLayout);
+        updatePlayerLayout();
 
         // Initial boot: start loading if video link provided, else show landing screen
         const initParams = new URLSearchParams(window.location.search);
