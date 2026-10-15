@@ -322,26 +322,28 @@
 
         #stage.hide-ui #controls,
         #stage.hide-ui #titleBar {
-            opacity: 0;
-            pointer-events: none;
+            opacity: 0 !important;
+            pointer-events: none !important;
         }
 
         #stage.hide-ui #controls {
-            transform: translateY(12px) scale(0.98);
+            transform: translateY(14px) scale(0.98) !important;
         }
 
         #stage.hide-ui #titleBar {
-            transform: translateY(-6px);
+            transform: translateY(-8px) !important;
         }
 
-        /* When hovering controls/title or hovering near bottom of player, both parts appear smoothly */
-        #controls:hover,
-        #titleBar:hover,
-        #stage.mouse-near-bottom #controls,
-        #stage.mouse-near-bottom #titleBar {
-            opacity: 1 !important;
-            pointer-events: auto !important;
-            transform: translateY(0) scale(1) !important;
+        /* Hovering controls/title or hovering near bottom of player appears smoothly on mouse devices only */
+        @media (hover: hover) and (pointer: fine) {
+            #stage:not(.hide-ui) #controls:hover,
+            #stage:not(.hide-ui) #titleBar:hover,
+            #stage.mouse-near-bottom:not(.hide-ui) #controls,
+            #stage.mouse-near-bottom:not(.hide-ui) #titleBar {
+                opacity: 1 !important;
+                pointer-events: auto !important;
+                transform: translateY(0) scale(1) !important;
+            }
         }
 
         .ctl-btn {
@@ -508,25 +510,37 @@
             position: absolute;
             top: 48px;
             left: 50%;
-            transform: translateX(-50%) translateY(-10px) scale(0.95);
+            transform: translateX(-50%) translateY(-10px) scale(0.92);
             width: 220px;
             height: 38px;
             border-radius: 9999px;
-            background: rgba(18, 18, 20, 0.65);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+            background: rgba(18, 18, 24, 0.82);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.2);
             opacity: 0;
             pointer-events: none;
-            transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.4, 0.64, 1);
             z-index: 100;
             overflow: hidden;
+            display: none !important;
         }
 
         .capsule-hud.show {
+            display: block !important;
             opacity: 1;
             transform: translateX(-50%) translateY(0) scale(1);
+        }
+
+        @keyframes chPulse {
+            0% { transform: translateX(-50%) translateY(0) scale(1); }
+            50% { transform: translateX(-50%) translateY(0) scale(1.04); }
+            100% { transform: translateX(-50%) translateY(0) scale(1); }
+        }
+
+        .capsule-hud.show.pulse {
+            animation: chPulse 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
 
         .ch-layer {
@@ -559,7 +573,7 @@
             border-radius: 9999px;
             background: #ffffff;
             overflow: hidden;
-            transition: width 0.08s ease;
+            transition: width 0.16s cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         .ch-fill {
@@ -583,7 +597,7 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* ============ VOLUME POPUP — VLC-style capsule slider ============ */
+        /* ============ VOLUME POPUP — VisionOS Liquid Glass Capsule Slider ============ */
         #volWrap {
             position: relative;
             flex-shrink: 0;
@@ -591,28 +605,31 @@
 
         #volPop {
             position: absolute;
-            bottom: 52px;
+            bottom: 56px;
             left: 50%;
-            transform: translateX(-50%) translateY(8px) scaleY(0.85);
+            transform: translateX(-50%) translateY(8px) scale(0.9);
             transform-origin: bottom;
-            background: rgba(0, 0, 0, 0.55);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            border-radius: 22px;
-            padding: 14px 13px;
+            background: rgba(18, 18, 26, 0.82);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            border-radius: 24px;
+            padding: 14px 12px;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
-            display: flex;
+            display: none !important;
             flex-direction: column;
             align-items: center;
             gap: 10px;
+            z-index: 50;
         }
 
         #volWrap.open #volPop {
+            display: flex !important;
             opacity: 1;
-            transform: translateX(-50%) translateY(0) scaleY(1);
+            transform: translateX(-50%) translateY(0) scale(1);
             pointer-events: auto;
         }
 
@@ -807,21 +824,20 @@
         /* Top Bar Reload Button */
         .title-action-btn {
             pointer-events: auto !important;
-            position: absolute;
-            right: 24px;
-            top: calc(16px + env(safe-area-inset-top));
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            margin-left: auto;
+            position: relative;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 50%;
-            width: 32px;
-            height: 32px;
+            width: 34px;
+            height: 34px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             color: #fff;
             cursor: pointer;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             transition: background 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
             flex-shrink: 0;
             z-index: 12;
@@ -848,7 +864,7 @@
             #titleBar {
                 padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
                 font-size: 18px;
-                justify-content: flex-start;
+                justify-content: space-between;
                 align-items: center;
             }
 
@@ -857,7 +873,7 @@
                 align-items: center;
                 justify-content: flex-start;
                 width: auto;
-                max-width: calc(100% - 60px);
+                max-width: calc(100% - 48px);
                 margin: 0;
                 text-align: left;
             }
@@ -1062,9 +1078,8 @@
         #stage.layout-mobile .ctl-btn svg { width: 20px; height: 20px; }
         #stage.layout-mobile #timeCurrent { order: 3; font-size: 11.5px; font-weight: 600; }
         #stage.layout-mobile #timeRemaining { order: 4; font-size: 11.5px; font-weight: 600; margin-right: auto; }
-        #stage.layout-mobile #volWrap { display: none !important; }
+        #stage.layout-mobile #volWrap { display: flex !important; order: 5; }
         #stage.layout-mobile #pipBtn { display: none !important; }
-        #stage.layout-mobile #audioBtn { order: 5; padding: 4px 6px; }
         #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
         #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
         #stage.layout-mobile #fsBtn { order: 8; padding: 4px 0 4px 6px; }
@@ -1095,9 +1110,8 @@
         #stage.layout-tablet #playBtn { order: unset; }
         #stage.layout-tablet #timeCurrent { order: unset; font-size: 11.5px; }
         #stage.layout-tablet #timeRemaining { order: unset; font-size: 11.5px; margin-right: 0; }
-        #stage.layout-tablet #volWrap { display: none !important; }
+        #stage.layout-tablet #volWrap { display: flex !important; order: unset; }
         #stage.layout-tablet #pipBtn { display: none !important; }
-        #stage.layout-tablet #audioBtn { order: unset; }
         #stage.layout-tablet #aspectBtn { order: unset; }
         #stage.layout-tablet #setBtn { order: unset; }
         #stage.layout-tablet #fsBtn { order: unset; }
@@ -1131,7 +1145,6 @@
         #stage.layout-desktop #timeRemaining { order: unset; font-size: 12.5px; font-weight: 500; margin-right: 0; }
         #stage.layout-desktop #volWrap { display: flex !important; order: unset; }
         #stage.layout-desktop #pipBtn { display: flex !important; order: unset; }
-        #stage.layout-desktop #audioBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #aspectBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #setBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #fsBtn { order: unset; padding: 6px; }
@@ -1184,19 +1197,28 @@
 
         #err {
             position: absolute;
-            bottom: 90px;
+            bottom: calc(86px + env(safe-area-inset-bottom));
             left: 50%;
             transform: translateX(-50%);
-            z-index: 30;
-            background: rgba(20, 20, 30, 0.95);
+            z-index: 35;
+            background: rgba(18, 18, 26, 0.92);
+            backdrop-filter: blur(24px) saturate(140%);
+            -webkit-backdrop-filter: blur(24px) saturate(140%);
             border: 1px solid rgba(255, 107, 107, 0.4);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
             color: #ff9b9b;
-            border-radius: 10px;
-            padding: 12px 18px;
-            font-size: 14px;
+            border-radius: 14px;
+            padding: 10px 16px;
+            font-size: 13.5px;
             display: none;
-            max-width: 90%;
+            max-width: min(540px, 92%);
+            width: max-content;
             text-align: center;
+            box-sizing: border-box;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
         }
 
         /* ============ GESTURE HUD — VLC-style edge sliders ============
@@ -2706,7 +2728,6 @@
                 <div class="title-identity">
                     <span class="accent"></span>
                     <span class="name" id="movieName">Loading…</span>
-                    <span class="title-audio-badge" id="titleAudioBadge"></span>
                 </div>
             </div>
             <button class="title-action-btn" id="titleReloadBtn" title="Reload player" aria-label="Reload player">
@@ -2784,7 +2805,7 @@
         </div>
 
         <!-- ============ CAPSULE HUD PILL (Volume & Brightness) ============ -->
-        <div id="capsuleHud" class="capsule-hud liquidgl-lens">
+        <div id="capsuleHud" class="capsule-hud">
             <div class="ch-layer ch-base">
                 <svg class="ch-icon" viewBox="0 0 24 24"><path id="chIconBase" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
                 <span class="ch-pct" id="chPctBase">100%</span>
@@ -2809,14 +2830,14 @@
                 </svg>
             </button>
 
-            <!-- 2. Volume Wrap -->
+            <!-- 2. Volume Wrap with Liquid Glass Popup -->
             <div id="volWrap">
                 <button class="ctl-btn" id="volBtn" aria-label="Volume">
                     <svg id="icoVol" viewBox="0 0 24 24">
                         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/>
                     </svg>
                 </button>
-                <div id="volPop">
+                <div id="volPop" class="liquidgl-lens">
                     <svg class="vp-icon" id="volPopIcon" viewBox="0 0 24 24">
                         <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/>
                     </svg>
@@ -2857,14 +2878,7 @@
                 </svg>
             </button>
 
-            <!-- 8. Audio Tracks Quick Selector -->
-            <button class="ctl-btn" id="audioBtn" aria-label="Audio Tracks" title="Audio Tracks & Languages">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-                </svg>
-            </button>
-
-            <!-- 9. Settings -->
+            <!-- 8. Settings -->
             <button class="ctl-btn" id="setBtn" aria-label="Settings" title="Settings">
                 <svg viewBox="0 0 24 24">
                     <path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.5 7.5 0 0 0-1.7-1L14.5 2.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5L9.2 5a7.5 7.5 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1a7.5 7.5 0 0 0 1.7 1l.3 2.6c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.3-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
@@ -3444,11 +3458,6 @@
                 drAudio.innerHTML = `<span class="dot"></span> ${count > 1 ? count + ' Audios' : '1 Audio'}`;
                 drAudio.classList.add('show');
             }
-            const titleAudio = $('titleAudioBadge');
-            if (titleAudio) {
-                titleAudio.innerHTML = `<span class="dot"></span> ${count > 1 ? count + ' Audios' : '1 Audio'}`;
-                titleAudio.classList.add('show');
-            }
 
             // Audio tracks formatting (purely informational, marking default audio stream)
             let audioHtml = '';
@@ -3564,11 +3573,13 @@
 
             $('titleBar').style.display = 'flex';
             $('controls').style.display = 'flex';
-            if ($('capsuleHud')) $('capsuleHud').style.display = '';
+            if ($('capsuleHud')) {
+                $('capsuleHud').classList.remove('show', 'pulse');
+                $('capsuleHud').style.display = '';
+            }
             centerIcon.style.display = 'flex';
             if ($('drResBadge')) $('drResBadge').classList.remove('show');
             if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
-            if ($('titleAudioBadge')) $('titleAudioBadge').classList.remove('show');
             if (errBox) errBox.style.display = 'none';
             updateTimeLabel();
 
@@ -3645,14 +3656,13 @@
             $('titleBar').style.display = 'none';
             $('controls').style.display = 'none';
             if ($('capsuleHud')) {
-                $('capsuleHud').classList.remove('show');
+                $('capsuleHud').classList.remove('show', 'pulse');
                 $('capsuleHud').style.display = 'none';
             }
             centerIcon.style.display = 'none';
             hideSpinner(true);
             if ($('drResBadge')) $('drResBadge').classList.remove('show');
             if ($('drAudioBadge')) $('drAudioBadge').classList.remove('show');
-            if ($('titleAudioBadge')) $('titleAudioBadge').classList.remove('show');
             try {
                 video.pause();
                 video.removeAttribute('src');
@@ -4156,30 +4166,35 @@
         }
         volTrack.addEventListener('pointerdown', e => {
             e.stopPropagation();
-            volTrack.setPointerCapture(e.pointerId);
+            try { volTrack.setPointerCapture(e.pointerId); } catch (_) { }
             isControlHubChangingVolume = true;
             const v = volFromEvent(e);
             setVolume(v);
         });
         volTrack.addEventListener('pointermove', e => {
-            if (e.buttons) {
+            if (isControlHubChangingVolume || e.buttons) {
                 isControlHubChangingVolume = true;
                 const v = volFromEvent(e);
                 setVolume(v);
             }
         });
-        volTrack.addEventListener('pointerup', () => {
+        volTrack.addEventListener('pointerup', e => {
+            try { if (e && e.pointerId !== undefined) volTrack.releasePointerCapture(e.pointerId); } catch (_) { }
             setTimeout(() => { isControlHubChangingVolume = false; }, 80);
         });
-        volTrack.addEventListener('pointercancel', () => {
+        volTrack.addEventListener('pointercancel', e => {
+            try { if (e && e.pointerId !== undefined) volTrack.releasePointerCapture(e.pointerId); } catch (_) { }
             setTimeout(() => { isControlHubChangingVolume = false; }, 80);
         });
         document.addEventListener('click', e => { if (!volWrap.contains(e.target)) volWrap.classList.remove('open'); });
+
+        let isBooting = true;
         setVolume(100);
+        setTimeout(() => { isBooting = false; }, 1000);
 
         /* Native volume change listener (fires on hardware buttons, media keys, bluetooth devices) */
         video.addEventListener('volumechange', () => {
-            if (isControlHubChangingVolume) return;
+            if (isBooting || isControlHubChangingVolume) return;
             const pct = video.muted ? 0 : Math.round(video.volume * 100);
             volFill.style.height = pct + '%';
             volThumb.style.bottom = pct + '%';
@@ -4212,33 +4227,6 @@
             drawerOverlay.classList.remove('open');
         }
         setBtn.addEventListener('click', e => { e.stopPropagation(); openDrawer(); });
-        const audioBtn = $('audioBtn');
-        if (audioBtn) {
-            audioBtn.addEventListener('click', e => {
-                e.stopPropagation();
-                openDrawer();
-                const audioRow = document.querySelector('[data-expand="secAudio"]');
-                const secAudio = $('secAudio');
-                if (audioRow && secAudio) {
-                    audioRow.classList.add('expanded');
-                    secAudio.classList.add('open');
-                    if (!metadataInspected && streamUrl) {
-                        metadataInspected = true;
-                        inspectMediaMetadata(streamUrl);
-                    }
-                    updateMediaInfoDisplay();
-                    setTimeout(() => secAudio.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
-                }
-            });
-        }
-        const titleAudioBadge = $('titleAudioBadge');
-        if (titleAudioBadge) {
-            titleAudioBadge.addEventListener('click', e => {
-                e.stopPropagation();
-                if (audioBtn) audioBtn.click();
-                else openDrawer();
-            });
-        }
         $('drawerClose').addEventListener('click', closeDrawer);
         drawerOverlay.addEventListener('click', closeDrawer);
         document.addEventListener('keydown', e => {
@@ -5300,7 +5288,7 @@
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
         function updateCapsuleHud(pathD, pct, displayStr) {
-            if ($('landingScreen') && $('landingScreen').classList.contains('show')) return;
+            if (isBooting || !streamUrl || ($('landingScreen') && $('landingScreen').classList.contains('show'))) return;
             const ch = $('capsuleHud');
             if (!ch) return;
             const clip = $('chClip');
@@ -5317,10 +5305,14 @@
             if (pctFill) pctFill.textContent = displayStr;
 
             ch.classList.add('show');
+            ch.classList.remove('pulse');
+            void ch.offsetWidth;
+            ch.classList.add('pulse');
+
             clearTimeout(capsuleHudTimer);
             capsuleHudTimer = setTimeout(() => {
-                ch.classList.remove('show');
-            }, 1500);
+                ch.classList.remove('show', 'pulse');
+            }, 1400);
         }
 
         let hudTimer = null;
@@ -5789,10 +5781,10 @@
             }
 
             const actionBtnHtml = useProxy
-                ? `<button id="errDirectBtn" style="margin-left:10px;background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">⚡ Switch to Direct Stream</button>`
-                : `<button id="errProxyBtn" style="margin-left:10px;background:#2563eb;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">🛡️ Retry via Proxy</button>`;
+                ? `<button id="errDirectBtn" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">⚡ Switch to Direct</button>`
+                : `<button id="errProxyBtn" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;">🛡️ Retry via Proxy</button>`;
 
-            errBox.innerHTML = `<span>⚠️ ${msg}</span>${actionBtnHtml}<button id="errVlcBtn" style="margin-left:10px;background:#e50914;color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;">Open in VLC</button><button id="errCloseBtn" title="Dismiss" style="margin-left:12px;background:none;border:none;color:#ff9b9b;font-size:16px;line-height:1;cursor:pointer;padding:4px 6px;">✕</button>`;
+            errBox.innerHTML = `<span>⚠️ ${msg}</span><div style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;">${actionBtnHtml}<button id="errVlcBtn" style="background:#e50914;color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;">Open in VLC</button><button id="errCloseBtn" title="Dismiss" style="background:rgba(255,255,255,0.12);border:none;color:#fff;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1;cursor:pointer;">✕</button></div>`;
             errBox.style.display = 'flex';
             errBox.style.alignItems = 'center';
             errBox.style.justifyContent = 'center';
