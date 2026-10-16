@@ -4293,8 +4293,8 @@
         // Mobile & device detection
         const isMobileScreen = window.innerWidth <= 768 || ('ontouchstart' in window && window.innerWidth <= 1024);
 
-        // Auto default: ON on desktop/capable devices; on battery-saver or mobile default to ON with low GPU footprint
-        let liquidGlassEnabled = liquidGlassPref !== null ? (liquidGlassPref === 'true') : true;
+        // Default: OFF by default (user can toggle it ON in Settings anytime)
+        let liquidGlassEnabled = liquidGlassPref !== null ? (liquidGlassPref === 'true') : false;
 
         function updateLiquidGlassToggle() {
             const btn = $('setLiquidGlass');
