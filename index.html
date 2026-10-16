@@ -73,58 +73,59 @@
             transition: width 0.15s ease, height 0.15s ease, max-width 0.15s ease, max-height 0.15s ease;
         }
 
+        #stage video,
         #stage.fit-contain video {
-            object-fit: contain;
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: auto;
+            object-fit: contain !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            aspect-ratio: auto !important;
         }
 
         #stage.fit-cover video {
-            object-fit: cover;
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: auto;
+            object-fit: cover !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            aspect-ratio: auto !important;
         }
 
         #stage.fit-fill video {
-            object-fit: fill;
-            width: 100%;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: auto;
+            object-fit: fill !important;
+            width: 100% !important;
+            height: 100% !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
+            aspect-ratio: auto !important;
         }
 
         #stage.fit-16-9 video {
-            object-fit: fill;
-            width: auto;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: 16 / 9;
+            object-fit: fill !important;
+            aspect-ratio: 16 / 9 !important;
+            width: min(100%, calc(100vh * (16 / 9))) !important;
+            height: min(100%, calc(100vw * (9 / 16))) !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
         }
 
         #stage.fit-21-9 video {
-            object-fit: fill;
-            width: 100%;
-            height: auto;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: 21 / 9;
+            object-fit: fill !important;
+            aspect-ratio: 21 / 9 !important;
+            width: min(100%, calc(100vh * (21 / 9))) !important;
+            height: min(100%, calc(100vw * (9 / 21))) !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
         }
 
         #stage.fit-4-3 video {
-            object-fit: fill;
-            width: auto;
-            height: 100%;
-            max-width: 100%;
-            max-height: 100%;
-            aspect-ratio: 4 / 3;
+            object-fit: fill !important;
+            aspect-ratio: 4 / 3 !important;
+            width: min(100%, calc(100vh * (4 / 3))) !important;
+            height: min(100%, calc(100vw * (3 / 4))) !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
         }
 
         /* ============ TOP TITLE BAR ============ */
@@ -694,6 +695,108 @@
             text-align: center;
         }
 
+        /* ============ ASPECT RATIO QUICK PICKER POPUP (VisionOS Liquid Glass) ============ */
+        #aspectWrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #aspectPop {
+            position: absolute;
+            bottom: 56px;
+            right: -24px;
+            transform: translateY(8px) scale(0.92);
+            transform-origin: bottom right;
+            background: rgba(18, 18, 26, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            padding: 12px 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
+            display: none !important;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 60;
+            width: 236px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #aspectWrap.open #aspectPop {
+            display: flex !important;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .ap-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: rgba(255, 255, 255, 0.65);
+            padding: 0 2px;
+        }
+
+        .ap-header svg {
+            width: 14px;
+            height: 14px;
+            fill: rgba(255, 255, 255, 0.7);
+        }
+
+        .ap-pills {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .ap-pill {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 7px 8px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            white-space: nowrap;
+        }
+
+        .ap-pill:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #fff;
+            transform: scale(1.02);
+        }
+
+        .ap-pill:active {
+            transform: scale(0.96);
+        }
+
+        .ap-pill.active {
+            background: rgba(229, 9, 20, 0.95);
+            border-color: #ff3344;
+            color: #fff;
+            font-weight: 700;
+            box-shadow: 0 2px 10px rgba(229, 9, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
         /* ============ APPLE SPOKE LOADER ============ */
         #spinner {
             position: absolute;
@@ -1010,6 +1113,7 @@
                 display: none !important;
             }
 
+            #aspectWrap,
             #aspectBtn {
                 order: 6;
                 padding: 4px 6px;
@@ -1080,6 +1184,7 @@
         #stage.layout-mobile #timeRemaining { order: 4; font-size: 11.5px; font-weight: 600; margin-right: auto; }
         #stage.layout-mobile #volWrap { display: flex !important; order: 5; }
         #stage.layout-mobile #pipBtn { display: none !important; }
+        #stage.layout-mobile #aspectWrap,
         #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
         #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
         #stage.layout-mobile #fsBtn { order: 8; padding: 4px 0 4px 6px; }
@@ -1112,6 +1217,7 @@
         #stage.layout-tablet #timeRemaining { order: unset; font-size: 11.5px; margin-right: 0; }
         #stage.layout-tablet #volWrap { display: flex !important; order: unset; }
         #stage.layout-tablet #pipBtn { display: none !important; }
+        #stage.layout-tablet #aspectWrap,
         #stage.layout-tablet #aspectBtn { order: unset; }
         #stage.layout-tablet #setBtn { order: unset; }
         #stage.layout-tablet #fsBtn { order: unset; }
@@ -1145,6 +1251,7 @@
         #stage.layout-desktop #timeRemaining { order: unset; font-size: 12.5px; font-weight: 500; margin-right: 0; }
         #stage.layout-desktop #volWrap { display: flex !important; order: unset; }
         #stage.layout-desktop #pipBtn { display: flex !important; order: unset; }
+        #stage.layout-desktop #aspectWrap,
         #stage.layout-desktop #aspectBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #setBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #fsBtn { order: unset; padding: 6px; }
@@ -1326,31 +1433,31 @@
         /* Aspect Ratio & Fit Badge top-center toast */
         #fitBadge {
             position: absolute;
-            top: 22px;
+            top: calc(68px + env(safe-area-inset-top, 0px));
             left: 50%;
-            transform: translateX(-50%) translateY(-6px);
-            z-index: 25;
-            background: rgba(10, 10, 15, 0.85);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-radius: 20px;
-            padding: 7px 16px;
+            transform: translateX(-50%) translateY(-10px) scale(0.95);
+            z-index: 75;
+            background: rgba(15, 15, 22, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65), 0 0 1px rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            border-radius: 9999px;
+            padding: 8px 20px;
             color: #fff;
-            font-size: 13px;
+            font-size: 13.5px;
             font-weight: 600;
             display: flex;
             align-items: center;
             gap: 8px;
             pointer-events: none;
             opacity: 0;
-            transition: opacity 0.22s ease, transform 0.22s ease;
+            transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
         }
 
         #fitBadge.show {
             opacity: 1;
-            transform: translateX(-50%) translateY(0);
+            transform: translateX(-50%) translateY(0) scale(1);
         }
 
         #fitBadge svg {
@@ -2838,12 +2945,28 @@
             <span class="time-label" id="timeRemaining" title="Click to toggle remaining / total">-0:00</span>
             <span id="timeLabel" style="display:none">0:00 / 0:00</span>
 
-            <!-- 6. Screen Fit / Aspect Ratio -->
-            <button class="ctl-btn" id="aspectBtn" aria-label="Screen Fit" title="Screen Fit / Aspect Ratio (Z)">
-                <svg viewBox="0 0 24 24">
-                    <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/>
-                </svg>
-            </button>
+            <!-- 6. Screen Fit / Aspect Ratio Wrap with VisionOS Glass Quick Picker -->
+            <div id="aspectWrap">
+                <button class="ctl-btn" id="aspectBtn" aria-label="Screen Fit" title="Screen Fit / Aspect Ratio (Z)">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/>
+                    </svg>
+                </button>
+                <div id="aspectPop">
+                    <div class="ap-header">
+                        <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/></svg>
+                        <span>Aspect Ratio</span>
+                    </div>
+                    <div class="ap-pills" id="aspectQuickPills">
+                        <button class="ap-pill active" data-fit="contain">Fit</button>
+                        <button class="ap-pill" data-fit="cover">Fill</button>
+                        <button class="ap-pill" data-fit="fill">Stretch</button>
+                        <button class="ap-pill" data-fit="16:9">16:9</button>
+                        <button class="ap-pill" data-fit="21:9">21:9</button>
+                        <button class="ap-pill" data-fit="4:3">4:3</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- 7. Picture-in-Picture -->
             <button class="ctl-btn" id="pipBtn" aria-label="Picture-in-Picture" title="Picture in Picture (P)">
@@ -4160,7 +4283,10 @@
             try { if (e && e.pointerId !== undefined) volTrack.releasePointerCapture(e.pointerId); } catch (_) { }
             setTimeout(() => { isControlHubChangingVolume = false; }, 80);
         });
-        document.addEventListener('click', e => { if (!volWrap.contains(e.target)) volWrap.classList.remove('open'); });
+        document.addEventListener('click', e => {
+            if (!volWrap.contains(e.target)) volWrap.classList.remove('open');
+            if (aspectWrap && !aspectWrap.contains(e.target)) aspectWrap.classList.remove('open');
+        });
 
         let isBooting = true;
         setVolume(100);
@@ -4413,7 +4539,14 @@
             stage.classList.add(`fit-${mode.id.replace(':', '-')}`);
 
             if ($('aspectVal')) $('aspectVal').textContent = mode.label;
+
+            // Sync settings drawer pills
             document.querySelectorAll('#aspectPills .aspect-pill').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.fit === mode.id);
+            });
+
+            // Sync quick picker popup pills
+            document.querySelectorAll('#aspectQuickPills .ap-pill').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.fit === mode.id);
             });
 
@@ -4421,9 +4554,11 @@
                 const badge = $('fitBadge'), text = $('fitBadgeText');
                 if (badge && text) {
                     text.textContent = mode.desc;
+                    badge.classList.remove('show');
+                    void badge.offsetWidth;
                     badge.classList.add('show');
                     clearTimeout(fitBadgeTimer);
-                    fitBadgeTimer = setTimeout(() => badge.classList.remove('show'), 1200);
+                    fitBadgeTimer = setTimeout(() => badge.classList.remove('show'), 1500);
                 }
             }
         }
@@ -4433,11 +4568,42 @@
             setFitMode(FIT_MODES[currentFitIdx].id, true);
         }
 
+        const aspectWrap = $('aspectWrap');
         const aspectBtn = $('aspectBtn');
-        if (aspectBtn) aspectBtn.addEventListener('click', e => {
-            e.stopPropagation();
-            cycleFitMode();
-            wakeUI();
+
+        function toggleAspectPop(force) {
+            if (!aspectWrap) return;
+            const isOpen = aspectWrap.classList.contains('open');
+            const next = typeof force === 'boolean' ? force : !isOpen;
+            aspectWrap.classList.toggle('open', next);
+            if (next) wakeUI(5000);
+        }
+
+        if (aspectBtn) {
+            const onAspectTrigger = e => {
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable && e.type === 'touchend') e.preventDefault();
+                }
+                toggleAspectPop();
+                wakeUI(5000);
+            };
+            aspectBtn.addEventListener('click', onAspectTrigger);
+            aspectBtn.addEventListener('touchend', onAspectTrigger, { passive: false });
+        }
+
+        document.querySelectorAll('#aspectQuickPills .ap-pill').forEach(btn => {
+            const onPillSelect = e => {
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable && e.type === 'touchend') e.preventDefault();
+                }
+                setFitMode(btn.dataset.fit, true);
+                if (aspectWrap) aspectWrap.classList.remove('open');
+                wakeUI(3500);
+            };
+            btn.addEventListener('click', onPillSelect);
+            btn.addEventListener('touchend', onPillSelect, { passive: false });
         });
 
         document.querySelectorAll('#aspectPills .aspect-pill').forEach(btn => {
@@ -5257,7 +5423,7 @@
         let holding = false;
 
         function inControls(e) {
-            return e.target.closest('#controls, #volPop, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
+            return e.target.closest('#controls, #volPop, #aspectPop, #aspectWrap, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
         }
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
@@ -5423,6 +5589,7 @@
                     if (!stage.classList.contains('mouse-near-bottom') && !isMouseOverUI) {
                         stage.classList.add('hide-ui');
                         volWrap.classList.remove('open');
+                        if (aspectWrap) aspectWrap.classList.remove('open');
                         pauseLiquidGlass();
                     }
                 }, duration);
