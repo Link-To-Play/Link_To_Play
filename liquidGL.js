@@ -17,7 +17,11 @@
   let renderFrame = 0;
   let renderRaf = null;
   let stopSync = null;
-  const renderAll = () => window.__liquidGLRenderer__?.render();
+  const renderAll = () => {
+    for (const r of renderers) {
+      try { r.render(); } catch (_) { }
+    }
+  };
   const startRendering = () => {
     if (renderRaf !== null || stopSync || !renderers.size) return;
     const loop = () => {
@@ -4417,7 +4421,10 @@ fn fs() -> @location(0) vec4<f32> {
         this.texture.width !== w ||
         this.texture.height !== h
       ) {
-        if (this.texture) this.texture.destroy();
+        if (this.texture) {
+          const oldTex = this.texture;
+          setTimeout(() => { try { oldTex.destroy(); } catch (_) { } }, 200);
+        }
         this.texture = this.device.createTexture({
           size: [w, h],
           format: "rgba8unorm",
@@ -4962,7 +4969,10 @@ fn fs() -> @location(0) vec4<f32> {
           this._stackTexture.width !== this.canvas.width ||
           this._stackTexture.height !== this.canvas.height)
       ) {
-        if (this._stackTexture) this._stackTexture.destroy();
+        if (this._stackTexture) {
+          const old = this._stackTexture;
+          setTimeout(() => { try { old.destroy(); } catch (_) { } }, 200);
+        }
         this._stackTexture = device.createTexture({
           size: [this.canvas.width, this.canvas.height],
           format: this.format,
@@ -4991,7 +5001,10 @@ fn fs() -> @location(0) vec4<f32> {
         this._outputTexture.width !== this.canvas.width ||
         this._outputTexture.height !== this.canvas.height
       ) {
-        if (this._outputTexture) this._outputTexture.destroy();
+        if (this._outputTexture) {
+          const old = this._outputTexture;
+          setTimeout(() => { try { old.destroy(); } catch (_) { } }, 200);
+        }
         this._outputTexture = device.createTexture({
           size: [this.canvas.width, this.canvas.height],
           format: this.format,
