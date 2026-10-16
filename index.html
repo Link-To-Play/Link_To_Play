@@ -1073,18 +1073,16 @@
         }
         #stage.layout-mobile #seek { height: 4px; }
         #stage.layout-mobile #seek::-webkit-slider-thumb { width: 14px; height: 14px; }
-        #stage.layout-mobile #rw10Btn { order: 2; padding: 4px 4px; }
-        #stage.layout-mobile #playBtn { order: 3; padding: 4px 5px; }
-        #stage.layout-mobile #fwd10Btn { order: 4; padding: 4px 4px; }
-        #stage.layout-mobile .ctl-btn { padding: 4px 5px; }
+        #stage.layout-mobile #playBtn { order: 2; padding: 4px 6px 4px 0; }
+        #stage.layout-mobile .ctl-btn { padding: 4px 6px; }
         #stage.layout-mobile .ctl-btn svg { width: 20px; height: 20px; }
-        #stage.layout-mobile #timeCurrent { order: 5; font-size: 11px; font-weight: 600; }
-        #stage.layout-mobile #timeRemaining { order: 6; font-size: 11px; font-weight: 600; margin-right: auto; }
-        #stage.layout-mobile #volWrap { display: flex !important; order: 7; }
+        #stage.layout-mobile #timeCurrent { order: 3; font-size: 11.5px; font-weight: 600; }
+        #stage.layout-mobile #timeRemaining { order: 4; font-size: 11.5px; font-weight: 600; margin-right: auto; }
+        #stage.layout-mobile #volWrap { display: flex !important; order: 5; }
         #stage.layout-mobile #pipBtn { display: none !important; }
-        #stage.layout-mobile #aspectBtn { order: 8; padding: 4px 5px; }
-        #stage.layout-mobile #setBtn { order: 9; padding: 4px 5px; }
-        #stage.layout-mobile #fsBtn { order: 10; padding: 4px 0 4px 4px; }
+        #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
+        #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
+        #stage.layout-mobile #fsBtn { order: 8; padding: 4px 0 4px 6px; }
         #stage.layout-mobile #briEdge { display: none !important; }
 
         /* Tablet / Landscape Hub (Single Row Compact Floating Capsule) */
@@ -1478,20 +1476,23 @@
             box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
         }
 
-        .seek-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            transition: transform 0.12s ease, opacity 0.15s ease;
+        #stage.layout-mobile .yt-seek-hud.left {
+            padding-left: 20px;
         }
-
-        .seek-btn:active {
-            transform: scale(0.88);
+        #stage.layout-mobile .yt-seek-hud.right {
+            padding-right: 20px;
         }
-
-        .seek-btn svg {
-            width: 22px;
-            height: 22px;
+        #stage.layout-mobile .jio-seek-badge {
+            width: 66px;
+            height: 66px;
+        }
+        #stage.layout-mobile .jio-seek-svg {
+            width: 32px;
+            height: 32px;
+        }
+        #stage.layout-mobile .jio-seek-ripple {
+            width: 66px;
+            height: 66px;
         }
 
         /* ============ SETTINGS DRAWER — right-anchored panel ============
@@ -2792,15 +2793,7 @@
         </div>
 
         <div id="controls" class="liquidgl-lens">
-            <!-- 1a. Rewind 10s (JioHotstar style) -->
-            <button class="ctl-btn seek-btn" id="rw10Btn" aria-label="Rewind 10 seconds" title="Rewind 10s (Left Arrow)">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
-                    <path d="M10.9 16h-1.4v-4.6l-1.3.5V11l2.4-.9h.3v5.9zm4.2-.1c-.4 0-.8-.1-1.1-.3-.3-.2-.5-.5-.7-.9-.2-.4-.2-.8-.2-1.4v-.9c0-.6.1-1 .2-1.4.2-.4.4-.7.7-.9.3-.2.7-.3 1.1-.3s.8.1 1.1.3c.3.2.5.5.7.9.2.4.2.8.2 1.4v.9c0 .6-.1 1-.2 1.4-.2.4-.4.7-.7.9-.3.2-.7.3-1.1.3zm0-1c.2 0 .4-.1.5-.2.1-.2.2-.4.2-.7v-1.4c0-.3-.1-.5-.2-.7-.1-.2-.3-.2-.5-.2s-.4.1-.5.2c-.1.2-.2.4-.2.7v1.4c0 .3.1.5.2.7.1.1.3.2.5.2z"/>
-                </svg>
-            </button>
-
-            <!-- 1b. Play / Pause -->
+            <!-- 1. Play / Pause -->
             <button class="ctl-btn" id="playBtn" aria-label="Play/Pause">
                 <svg id="icoPlay" viewBox="0 0 24 24">
                     <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86a1 1 0 0 0-1.5.86z"/>
@@ -2808,14 +2801,6 @@
                 <svg id="icoPause" viewBox="0 0 24 24" style="display:none">
                     <rect x="6" y="4" width="4" height="16" rx="1.5"/>
                     <rect x="14" y="4" width="4" height="16" rx="1.5"/>
-                </svg>
-            </button>
-
-            <!-- 1c. Forward 10s (JioHotstar style) -->
-            <button class="ctl-btn seek-btn" id="fwd10Btn" aria-label="Forward 10 seconds" title="Forward 10s (Right Arrow)">
-                <svg viewBox="0 0 24 24">
-                    <path d="M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8h-2z"/>
-                    <path d="M10.9 16h-1.4v-4.6l-1.3.5V11l2.4-.9h.3v5.9zm4.2-.1c-.4 0-.8-.1-1.1-.3-.3-.2-.5-.5-.7-.9-.2-.4-.2-.8-.2-1.4v-.9c0-.6.1-1 .2-1.4.2-.4.4-.7.7-.9.3-.2.7-.3 1.1-.3s.8.1 1.1.3c.3.2.5.5.7.9.2.4.2.8.2 1.4v.9c0 .6-.1 1-.2 1.4-.2.4-.4.7-.7.9-.3.2-.7.3-1.1.3zm0-1c.2 0 .4-.1.5-.2.1-.2.2-.4.2-.7v-1.4c0-.3-.1-.5-.2-.7-.1-.2-.3-.2-.5-.2s-.4.1-.5.2c-.1.2-.2.4-.2.7v1.4c0 .3.1.5.2.7.1.1.3.2.5.2z"/>
                 </svg>
             </button>
 
@@ -5265,10 +5250,10 @@
            - double-tap left/right  → −10s / +10s
            - single tap             → toggle UI                                */
 
-        const HOLD_MS = 350, TAP_MS = 300, SWIPE_THRESH = 24;
+        const HOLD_MS = 350, TAP_MS = 320, SWIPE_THRESH = 24;
 
         let g = null;          /* active gesture state */
-        let lastTap = 0, tapTimer = null;
+        let lastTapTime = 0, lastTapSide = null, tapTimer = null;
         let holding = false;
 
         function inControls(e) {
@@ -5394,20 +5379,6 @@
             }, 650);
         }
 
-        const rw10Btn = $('rw10Btn'), fwd10Btn = $('fwd10Btn');
-        if (rw10Btn) {
-            rw10Btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                seekFx('L');
-            });
-        }
-        if (fwd10Btn) {
-            fwd10Btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                seekFx('R');
-            });
-        }
-
         let isMouseOverUI = false;
         const titleBar = $('titleBar'), controls = $('controls');
 
@@ -5506,11 +5477,22 @@
             if (e.pointerType === 'touch') {
                 try { stage.setPointerCapture(e.pointerId); } catch (_) { }
             }
+            const tapSide = e.clientX < innerWidth / 2 ? 'L' : 'R';
+
+            // Cancel any pending single-tap action IMMEDIATELY if this new touch
+            // lands within the double-tap window on the same side or active seek side!
+            const timeSinceLast = Date.now() - lastTapTime;
+            const isSeekingSide = seekFxState[tapSide].total > 0;
+            if (tapTimer && (timeSinceLast < 380 || isSeekingSide)) {
+                clearTimeout(tapTimer);
+                tapTimer = null;
+            }
+
             const uiWasHidden = stage.classList.contains('hide-ui');
             g = {
                 x0: e.clientX, y0: e.clientY, t0: Date.now(),
                 mode: null,                    /* null | 'vol' | 'bri' */
-                side: e.clientX < innerWidth / 2 ? 'L' : 'R',
+                side: tapSide,
                 startVol: video.volume * 100,
                 startBri: fx.bri,
                 moved: false,
@@ -5576,20 +5558,30 @@
             }
 
             const dt = Date.now() - g.t0;
-            const movedFar = Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > 12;
+            const isTouch = (e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
+            // Allow natural finger movement on touchscreens (28px) vs mouse click (14px)
+            const maxMove = isTouch ? 28 : 14;
+            const movedFar = Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > maxMove;
+
             if (!movedFar && dt < HOLD_MS) {             /* tap / double-tap */
                 const now = Date.now();
+                const timeSinceLast = g.t0 - lastTapTime;
                 const isSeekingSide = seekFxState[g.side].total > 0;
-                if (now - lastTap < TAP_MS || isSeekingSide) {
+                const isDoubleTap = (timeSinceLast < 380 && lastTapSide === g.side) || isSeekingSide;
+
+                if (isDoubleTap) {
                     /* every tap within the window while a tap-chain is running
                        seeks again — tap storms accumulate: ±10s each */
-                    clearTimeout(tapTimer); tapTimer = null;
-                    lastTap = now;
+                    clearTimeout(tapTimer);
+                    tapTimer = null;
+                    lastTapTime = now;
+                    lastTapSide = g.side;
                     seekFx(g.side);
                 } else {
-                    lastTap = now;
+                    lastTapTime = now;
+                    lastTapSide = g.side;
                     const tapWasHidden = g.uiWasHidden;
-                    const isTouch = (e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
+                    clearTimeout(tapTimer);
                     tapTimer = setTimeout(() => {
                         tapTimer = null;
                         if (isTouch) {
@@ -5601,14 +5593,14 @@
                                 /* Tap to hide: dismiss immediately */
                                 stage.classList.add('hide-ui');
                                 clearTimeout(wakeUI.t);
-                                if (window.liquidGL && window.liquidGL.pause) window.liquidGL.pause();
+                                pauseLiquidGlass();
                             }
                         } else {
                             /* Desktop mouse click: wakes UI and toggles play/pause */
                             wakeUI(3500);
                             togglePlay();
                         }
-                    }, TAP_MS);
+                    }, 300);
                 }
             }
             try { if (g && g.pointerId !== undefined) stage.releasePointerCapture(g.pointerId); } catch (_) { }
