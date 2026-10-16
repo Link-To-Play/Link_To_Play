@@ -3485,7 +3485,10 @@
             if (!rawUrl) return '';
             if (useProxy) {
                 if (rawUrl.startsWith('/api/proxy') || rawUrl.includes('/api/proxy?url=')) return rawUrl;
-                return `${location.origin}/api/proxy?url=${encodeURIComponent(rawUrl)}`;
+                const proxyBase = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+                    ? 'https://stream.harisgarage.workers.dev/api/proxy'
+                    : `${location.origin}/api/proxy`;
+                return `${proxyBase}?url=${encodeURIComponent(rawUrl)}`;
             }
             return rawUrl;
         }
@@ -3698,15 +3701,24 @@
             video.src = effectiveSrc;
             video.load();
 
-            // 6. Resume position if saved
+            // 6. Resume position safely once video frames are ready to seek
             const RK = 'streamResume:' + streamUrl;
-            const onMeta = () => {
+            let resumeAttempted = false;
+            const applyResume = () => {
+                if (resumeAttempted) return;
                 try {
-                    const t = parseFloat(localStorage.getItem(RK) || 0);
-                    if (t > 5 && t < video.duration - 3) video.currentTime = t;
+                    const saved = parseFloat(localStorage.getItem(RK) || '0');
+                    if (saved > 5) {
+                        if (video.duration && (saved >= video.duration - 15 || saved >= video.duration * 0.95)) {
+                            localStorage.removeItem(RK);
+                            return;
+                        }
+                        resumeAttempted = true;
+                        video.currentTime = saved;
+                    }
                 } catch (e) { }
             };
-            video.addEventListener('loadedmetadata', onMeta, { once: true });
+            video.addEventListener('canplay', applyResume, { once: true });
 
             updateMediaInfoDisplay();
 
@@ -4043,6 +4055,9 @@
             setPlayIcon();
             releaseWakeLock();
             showCenter(D_PLAY, true);
+            if (streamUrl) {
+                try { localStorage.removeItem('streamResume:' + streamUrl); } catch (e) { }
+            }
         });
 
         /* ================= SEEK SLIDER ================= */
@@ -5940,6 +5955,20 @@
             // If video is actually playing, ignore spurious decode/channel errors
             if (!video.paused && video.currentTime > 0.5) return;
 
+            // Auto-recovery: If stream failed on a video that was resumed,
+            // the upstream server dropped the Range seek request. Clear resume and restart smoothly from 0:00!
+            const RK = streamUrl ? ('streamResume:' + streamUrl) : null;
+            if (RK && localStorage.getItem(RK)) {
+                console.warn('Playback error encountered on resumed video; clearing saved resume point and restarting from 0:00...');
+                try { localStorage.removeItem(RK); } catch (e) { }
+                if (errBox) errBox.style.display = 'none';
+                video.currentTime = 0;
+                video.src = getEffectiveStreamUrl(streamUrl);
+                video.load();
+                video.play().catch(() => {});
+                return;
+            }
+
             const code = video.error ? video.error.code : 0;
             let msg = '';
             if (useProxy) {
@@ -5991,7 +6020,11 @@
 
         setInterval(() => {
             if (streamUrl && video.currentTime > 5 && !video.paused) {
-                try { localStorage.setItem('streamResume:' + streamUrl, String(video.currentTime)); } catch (e) { }
+                if (video.duration && (video.currentTime >= video.duration - 15 || video.currentTime >= video.duration * 0.95)) {
+                    try { localStorage.removeItem('streamResume:' + streamUrl); } catch (e) { }
+                } else {
+                    try { localStorage.setItem('streamResume:' + streamUrl, String(video.currentTime)); } catch (e) { }
+                }
             }
         }, 5000);
 
