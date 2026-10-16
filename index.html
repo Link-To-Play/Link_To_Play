@@ -1369,22 +1369,25 @@
             position: absolute;
             top: 0;
             bottom: 0;
-            width: 42%;
+            width: 48%;
             z-index: 25;
             display: flex;
             align-items: center;
-            justify-content: center;
             pointer-events: none;
             opacity: 0;
             transition: opacity 0.22s ease;
         }
 
         .yt-seek-hud.left {
-            left: 4%;
+            left: 0;
+            justify-content: flex-start;
+            padding-left: clamp(28px, 12vw, 130px);
         }
 
         .yt-seek-hud.right {
-            right: 4%;
+            right: 0;
+            justify-content: flex-end;
+            padding-right: clamp(28px, 12vw, 130px);
         }
 
         .yt-seek-hud.show {
