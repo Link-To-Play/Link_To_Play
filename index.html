@@ -3,6 +3,37 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        /* Instant Stream Sniffer: Warm DNS and TLS sockets the microsecond a stream is spotted */
+        (function () {
+            try {
+                var p = new URLSearchParams(window.location.search);
+                var u = p.get('video') || p.get('url') || p.get('stream');
+                if (!u && window.location.hash) {
+                    var h = window.location.hash.substring(1);
+                    var hp = new URLSearchParams(h);
+                    u = hp.get('video') || hp.get('url') || hp.get('stream');
+                }
+                if (u && u.trim()) {
+                    u = u.trim();
+                    window.__EARLY_STREAM_URL__ = u;
+                    var origin = new URL(u, window.location.origin).origin;
+                    if (origin && origin !== window.location.origin) {
+                        var pre = document.createElement('link');
+                        pre.rel = 'preconnect';
+                        pre.href = origin;
+                        pre.crossOrigin = 'anonymous';
+                        document.head.appendChild(pre);
+
+                        var dns = document.createElement('link');
+                        dns.rel = 'dns-prefetch';
+                        dns.href = origin;
+                        document.head.appendChild(dns);
+                    }
+                }
+            } catch (e) { }
+        })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Stream Player v2</title>
     <link rel="manifest" href="manifest.json">
@@ -2921,6 +2952,25 @@
 
     <div id="stage">
         <video id="video" crossorigin="anonymous" playsinline preload="auto"></video>
+        <script>
+            /* Instant Media Buffer Starter: Attach stream and trigger browser media pipeline before parsing rest of page */
+            (function () {
+                try {
+                    var u = window.__EARLY_STREAM_URL__;
+                    var v = document.getElementById('video');
+                    if (u && v) {
+                        v.preload = 'auto';
+                        v.src = u;
+                        v.load();
+                        v.muted = true;
+                        var p = v.play();
+                        if (p && p.catch) {
+                            p.catch(function () { });
+                        }
+                    }
+                } catch (e) { }
+            })();
+        </script>
 
         <!-- ============ LANDING SCREEN (when no ?video= is provided) ============ -->
         <div id="landingScreen">
@@ -3556,7 +3606,7 @@
     </div>
 
     <!-- liquidGL – Liquid Glass WebGPU/WebGL Shader Engine -->
-    <script src="liquidGL.js"></script>
+    <script src="liquidGL.js" defer></script>
     <script>
         let streamUrl = '';
         const $ = id => document.getElementById(id);
@@ -3601,19 +3651,7 @@
         function hideSpinner(immediate = false) {
             if (!spinner) return;
             clearTimeout(spinnerHideTimeout);
-            if (immediate) {
-                spinner.classList.add('hidden');
-                return;
-            }
-            const elapsed = Date.now() - spinnerShownAt;
-            const minWait = 400;
-            if (elapsed < minWait) {
-                spinnerHideTimeout = setTimeout(() => {
-                    spinner.classList.add('hidden');
-                }, minWait - elapsed);
-            } else {
-                spinner.classList.add('hidden');
-            }
+            spinner.classList.add('hidden');
         }
 
         function advanceLoader() {
@@ -4097,8 +4135,12 @@
 
             // 5. Connect stream to video element and trigger explicit resource loading
             const effectiveSrc = getEffectiveStreamUrl(streamUrl);
-            video.src = effectiveSrc;
-            video.load();
+            const isAlreadyLoaded = (video.src === effectiveSrc) || (video.currentSrc === effectiveSrc);
+            if (!isAlreadyLoaded) {
+                video.preload = 'auto';
+                video.src = effectiveSrc;
+                video.load();
+            }
 
             // 6. Resume position if saved
             const RK = 'streamResume:' + streamUrl;
@@ -4108,41 +4150,82 @@
                     if (t > 5 && t < video.duration - 3) video.currentTime = t;
                 } catch (e) { }
             };
-            video.addEventListener('loadedmetadata', onMeta, { once: true });
+            if (video.readyState >= 1) {
+                onMeta();
+            } else {
+                video.addEventListener('loadedmetadata', onMeta, { once: true });
+            }
 
             updateMediaInfoDisplay();
 
-            // Initial state: show spinner while buffering stream
-            showSpinner();
+            // Initial state: hide spinner immediately if frames are already buffered, else show until data arrives
+            if (video.readyState >= 2) {
+                hideSpinner(true);
+            } else {
+                showSpinner();
+                const onInitialBufferReady = () => {
+                    hideSpinner(true);
+                    updateMediaInfoDisplay();
+                };
+                video.addEventListener('loadeddata', onInitialBufferReady, { once: true });
+                video.addEventListener('canplay', onInitialBufferReady, { once: true });
+                video.addEventListener('playing', onInitialBufferReady, { once: true });
+            }
             centerIcon.classList.remove('on');
             setPlayIcon();
 
-            // 8. Attempt playback if requested
+            // 8. Fast-start playback: attempt unmuted play, fallback to muted buffer-fill on mobile policy
             if (tryAutoPlay) {
+                video.muted = false;
                 const p = video.play();
                 if (p && p.catch) {
                     p.then(() => {
                         setPlayIcon();
                         hideSpinner(true);
                     }).catch(() => {
-                        // Autoplay blocked by mobile browser policy: show play button, hide spinner
-                        setPlayIcon();
-                        hideSpinner(true);
-                        showCenter(D_PLAY, true);
+                        // Unmuted autoplay blocked by policy: start muted playback immediately to download buffer ASAP
+                        video.muted = true;
+                        const pMuted = video.play();
+                        if (pMuted && pMuted.catch) {
+                            pMuted.then(() => {
+                                setPlayIcon();
+                                hideSpinner(true);
+                                // Unmute on first user touch, click, or key anywhere on screen
+                                const unmute = () => {
+                                    video.muted = false;
+                                    window.removeEventListener('click', unmute, true);
+                                    window.removeEventListener('touchstart', unmute, true);
+                                    window.removeEventListener('keydown', unmute, true);
+                                };
+                                window.addEventListener('click', unmute, { capture: true, once: true });
+                                window.addEventListener('touchstart', unmute, { capture: true, once: true });
+                                window.addEventListener('keydown', unmute, { capture: true, once: true });
+                            }).catch(() => {
+                                setPlayIcon();
+                                hideSpinner(true);
+                                showCenter(D_PLAY, true);
+                            });
+                        } else {
+                            setPlayIcon();
+                            hideSpinner(true);
+                        }
                     });
                 }
             } else {
-                // If not autoplaying, hide spinner once metadata/frames are available
                 const showPlay = () => {
                     if (video.paused && !video.ended) {
                         hideSpinner(true);
                         showCenter(D_PLAY, true);
                     }
                 };
-                video.addEventListener('loadedmetadata', showPlay, { once: true });
-                video.addEventListener('loadeddata', showPlay, { once: true });
-                video.addEventListener('canplay', showPlay, { once: true });
-                setTimeout(showPlay, 1000);
+                if (video.readyState >= 2) {
+                    showPlay();
+                } else {
+                    video.addEventListener('loadedmetadata', showPlay, { once: true });
+                    video.addEventListener('loadeddata', showPlay, { once: true });
+                    video.addEventListener('canplay', showPlay, { once: true });
+                    setTimeout(showPlay, 1000);
+                }
             }
 
             paintSeek();
@@ -4188,6 +4271,19 @@
         if (landingForm) landingForm.addEventListener('submit', submitStream);
         const landingSubmit = $('landingSubmit');
         if (landingSubmit) landingSubmit.addEventListener('click', submitStream);
+
+        // Instant Preconnect on URL entry/paste before clicking Play
+        const landingInputEl = $('landingUrl');
+        if (landingInputEl) {
+            const warmUrlOrigin = () => {
+                const raw = (landingInputEl.value || '').trim();
+                if (raw && /^https?:\/\//i.test(raw)) {
+                    preconnectOrigin(raw);
+                }
+            };
+            landingInputEl.addEventListener('input', warmUrlOrigin);
+            landingInputEl.addEventListener('paste', () => setTimeout(warmUrlOrigin, 10));
+        }
 
         // Copy Format syntax
         const copyFormatBtn = $('copyFormatBtn');
@@ -6568,7 +6664,13 @@
 
         // Initial boot: start loading if video link provided, else show landing screen
         const initParams = new URLSearchParams(window.location.search);
-        const initStream = initParams.get('video') || initParams.get('url') || initParams.get('stream');
+        let initStream = window.__EARLY_STREAM_URL__ || initParams.get('video') || initParams.get('url') || initParams.get('stream');
+        if (!initStream && window.location.hash) {
+            try {
+                const hp = new URLSearchParams(window.location.hash.substring(1));
+                initStream = hp.get('video') || hp.get('url') || hp.get('stream');
+            } catch (e) { }
+        }
         if (initStream && initStream.trim()) {
             loadStream(initStream.trim(), true);
         } else {
