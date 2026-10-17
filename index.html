@@ -6104,12 +6104,10 @@
             R: { total: 0, timer: null }
         };
         function applySeek(delta) {                       /* clamped + UI synced */
-            const target = Math.max(0, Math.min(video.duration || Infinity, video.currentTime + delta));
-            if (typeof video.fastSeek === 'function') {
-                try { video.fastSeek(target); } catch (e) { video.currentTime = target; }
-            } else {
-                video.currentTime = target;
-            }
+            const dur = (isFinite(video.duration) && video.duration > 0) ? video.duration : Infinity;
+            const cur = video.currentTime || 0;
+            const target = Math.max(0, Math.min(dur, cur + delta));
+            video.currentTime = target;
             /* 'seeked'/'timeupdate' will also fire, but update immediately so the
                slider + time label never lag a frame behind */
             if (video.duration) {
@@ -6253,16 +6251,16 @@
 
         stage.addEventListener('pointerdown', e => {
             if (inControls(e) || (landingScreen && landingScreen.classList.contains('show'))) return;
-            if (e.pointerType === 'touch') {
-                try { stage.setPointerCapture(e.pointerId); } catch (_) { }
-            }
-            const tapSide = e.clientX < innerWidth / 2 ? 'L' : 'R';
+            const uiWasHidden = stage.classList.contains('hide-ui');
+            const tapSide = e.clientX < (window.innerWidth / 2) ? 'L' : 'R';
 
             // Cancel any pending single-tap action IMMEDIATELY if this new touch
             // lands within the double-tap window on the same side or active seek side!
-            const timeSinceLast = Date.now() - lastTapTime;
+            const now = Date.now();
+            const timeSinceLast = now - lastTapTime;
             const isSeekingSide = seekFxState[tapSide].total > 0;
-            if (tapTimer && (timeSinceLast < 380 || isSeekingSide)) {
+            const isDoubleTapCandidate = (timeSinceLast < 450 && lastTapSide === tapSide) || isSeekingSide;
+            if (tapTimer && isDoubleTapCandidate) {
                 clearTimeout(tapTimer);
                 tapTimer = null;
                 // If UI was hidden, keep it hidden during double-tap seek
@@ -6272,9 +6270,8 @@
                 }
             }
 
-            const uiWasHidden = stage.classList.contains('hide-ui');
             g = {
-                x0: e.clientX, y0: e.clientY, t0: Date.now(),
+                x0: e.clientX, y0: e.clientY, t0: now,
                 mode: null,                    /* null | 'vol' | 'bri' */
                 side: tapSide,
                 startVol: video.volume * 100,
@@ -6311,6 +6308,7 @@
                     g.mode = 'bri';
                     clearTimeout(g.holdTimer);
                     g.moved = true;
+                    try { stage.setPointerCapture(g.pointerId); } catch (_) { }
                 }
             }
             if (g.mode === 'bri') {
@@ -6342,16 +6340,18 @@
             }
 
             const dt = Date.now() - g.t0;
-            const isTouch = (e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
-            // Allow natural finger movement on touchscreens (28px) vs mouse click (14px)
-            const maxMove = isTouch ? 28 : 14;
-            const movedFar = Math.hypot(e.clientX - g.x0, e.clientY - g.y0) > maxMove;
+            const isTouch = (e && e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
+            // Allow natural finger movement on touchscreens (40px) vs mouse click (16px)
+            const maxMove = isTouch ? 40 : 16;
+            const curX = (e && typeof e.clientX === 'number' && e.clientX !== 0) ? e.clientX : g.x0;
+            const curY = (e && typeof e.clientY === 'number' && e.clientY !== 0) ? e.clientY : g.y0;
+            const movedFar = Math.hypot(curX - g.x0, curY - g.y0) > maxMove;
 
             if (!movedFar && dt < HOLD_MS) {             /* tap / double-tap */
                 const now = Date.now();
                 const timeSinceLast = g.t0 - lastTapTime;
                 const isSeekingSide = seekFxState[g.side].total > 0;
-                const isDoubleTap = (timeSinceLast < 380 && lastTapSide === g.side) || isSeekingSide;
+                const isDoubleTap = (timeSinceLast < 450 && lastTapSide === g.side) || isSeekingSide;
 
                 if (isDoubleTap) {
                     /* every tap within the window while a tap-chain is running
@@ -6396,8 +6396,14 @@
             g = null;
         }
         stage.addEventListener('pointerup', endGesture);
-        stage.addEventListener('pointercancel', () => {
+        stage.addEventListener('pointercancel', e => {
             if (g) {
+                // If the pointer was canceled before moving, treat it as endGesture so taps aren't swallowed on mobile
+                const dt = Date.now() - g.t0;
+                if (!g.moved && dt < HOLD_MS) {
+                    endGesture(e);
+                    return;
+                }
                 clearTimeout(g.holdTimer);
                 if (holding) {
                     holding = false;
