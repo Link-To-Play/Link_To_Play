@@ -12,6 +12,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Stream">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z'/%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap"
@@ -5632,11 +5634,18 @@
         async function inspectMediaMetadata(url) {
             if (!url) return;
             const targets = [];
-            // Prioritize proxy target to guarantee CORS and Range bypass across origins
-            if (!url.startsWith('/api/proxy') && !url.includes('/api/proxy?url=')) {
-                targets.push(`/api/proxy?url=${encodeURIComponent(url)}`);
+            // In direct mode (default), prioritize direct URL first to avoid spurious proxy 404s
+            if (useProxy) {
+                if (!url.startsWith('/api/proxy') && !url.includes('/api/proxy?url=')) {
+                    targets.push(`/api/proxy?url=${encodeURIComponent(url)}`);
+                }
+                targets.push(url);
+            } else {
+                targets.push(url);
+                if (!url.startsWith('/api/proxy') && !url.includes('/api/proxy?url=')) {
+                    targets.push(`/api/proxy?url=${encodeURIComponent(url)}`);
+                }
             }
-            targets.push(url);
 
             for (const target of targets) {
                 try {
