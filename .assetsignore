@@ -1,7 +1,13 @@
-.git/
-.wrangler/
-scratch/
-prompt change/
+.git
+.git/**
+.wrangler
+.wrangler/**
+scratch
+scratch/**
+prompt change
+prompt change/**
+node_modules
+node_modules/**
 *.md
 *.html
 !index.html
