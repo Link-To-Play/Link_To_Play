@@ -6171,6 +6171,11 @@
             if (tapTimer && (timeSinceLast < 380 || isSeekingSide)) {
                 clearTimeout(tapTimer);
                 tapTimer = null;
+                // If UI was hidden, keep it hidden during double-tap seek
+                if (uiWasHidden) {
+                    stage.classList.add('hide-ui');
+                    clearTimeout(wakeUI.t);
+                }
             }
 
             const uiWasHidden = stage.classList.contains('hide-ui');
@@ -6261,6 +6266,11 @@
                     tapTimer = null;
                     lastTapTime = now;
                     lastTapSide = g.side;
+                    // Keep controls UI hidden so double-tap seek does not pop up the screen controls
+                    if (g.uiWasHidden) {
+                        stage.classList.add('hide-ui');
+                        clearTimeout(wakeUI.t);
+                    }
                     seekFx(g.side);
                 } else {
                     lastTapTime = now;
@@ -6285,7 +6295,7 @@
                             wakeUI(3500);
                             togglePlay();
                         }
-                    }, 300);
+                    }, 350);
                 }
             }
             try { if (g && g.pointerId !== undefined) stage.releasePointerCapture(g.pointerId); } catch (_) { }
@@ -6327,8 +6337,16 @@
                     }
                 }, HOLD_MS);
             }
-            else if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') seekFx('L');
-            else if (e.code === 'ArrowRight' || e.key === 'ArrowRight') seekFx('R');
+            else if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                seekFx('L');
+                return; // ArrowLeft seeks 10s without waking UI controls
+            }
+            else if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
+                e.preventDefault();
+                seekFx('R');
+                return; // ArrowRight seeks 10s without waking UI controls
+            }
             else if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
                 e.preventDefault();
                 const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
@@ -6401,10 +6419,16 @@
         video.addEventListener('waiting', () => {
             showSpinner();
         });
+        let seekingSpinnerTimer = null;
         video.addEventListener('seeking', () => {
-            showSpinner();
+            clearTimeout(seekingSpinnerTimer);
+            // Only show spinner if seeking buffer takes longer than 250ms (avoids flashing spinner on instant 10s seeks)
+            seekingSpinnerTimer = setTimeout(() => {
+                if (video.seeking && video.readyState < 3) showSpinner();
+            }, 250);
         });
         video.addEventListener('seeked', () => {
+            clearTimeout(seekingSpinnerTimer);
             if (video.readyState >= 3 && !video.paused) hideSpinner();
         });
         video.addEventListener('playing', () => {
