@@ -816,6 +816,7 @@
 
         #spinner.hidden {
             opacity: 0 !important;
+            visibility: hidden !important;
             transform: scale(0.85) !important;
             pointer-events: none !important;
         }
@@ -4047,25 +4048,26 @@
                 if (p && p.catch) {
                     p.then(() => {
                         setPlayIcon();
-                        if (video.readyState >= 3) hideSpinner();
+                        hideSpinner(true);
                     }).catch(() => {
-                        // Autoplay blocked by browser policy: show play button, keep spinner if still loading
+                        // Autoplay blocked by mobile browser policy: show play button, hide spinner
                         setPlayIcon();
-                        if (video.readyState >= 3) hideSpinner();
+                        hideSpinner(true);
                         showCenter(D_PLAY, true);
                     });
                 }
             } else {
-                // If not autoplaying, hide spinner once metadata/frames are actually available
+                // If not autoplaying, hide spinner once metadata/frames are available
                 const showPlay = () => {
                     if (video.paused && !video.ended) {
-                        if (video.readyState >= 3) hideSpinner();
+                        hideSpinner(true);
                         showCenter(D_PLAY, true);
                     }
                 };
                 video.addEventListener('loadedmetadata', showPlay, { once: true });
+                video.addEventListener('loadeddata', showPlay, { once: true });
                 video.addEventListener('canplay', showPlay, { once: true });
-                setTimeout(showPlay, 1200);
+                setTimeout(showPlay, 1000);
             }
 
             paintSeek();
@@ -4310,6 +4312,7 @@
             centerIcon.classList.add('on');
             if (sticky) {
                 centerIcon.classList.add('sticky');
+                hideSpinner(true);
             } else {
                 centerIcon.classList.remove('sticky');
             }
@@ -6333,24 +6336,22 @@
             }, 2400);
         });
         video.addEventListener('timeupdate', () => {
-            if (!video.paused && video.currentTime > 0 && video.readyState >= 3) {
-                hideSpinner();
+            if (!video.paused && video.currentTime > 0) {
+                hideSpinner(true);
             }
             if (video.currentTime > 0.5 && !video.paused) {
                 errBox.style.display = 'none';
             }
         });
         video.addEventListener('canplay', () => {
-            if (video.readyState >= 3 && (!video.paused || video.currentTime > 0)) {
-                hideSpinner();
-            }
+            hideSpinner(true);
             if (video.paused && !video.ended) showCenter(D_PLAY, true);
         });
         video.addEventListener('canplaythrough', () => {
-            if (video.readyState >= 3 && !video.paused) hideSpinner();
+            hideSpinner(true);
         });
         video.addEventListener('loadeddata', () => {
-            if (video.readyState >= 3 && !video.paused) hideSpinner();
+            hideSpinner(true);
             if (video.paused && !video.ended) showCenter(D_PLAY, true);
         });
         video.addEventListener('error', () => {
