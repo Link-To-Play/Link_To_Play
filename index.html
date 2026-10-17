@@ -1828,6 +1828,139 @@
             padding: 4px 18px 8px;
         }
 
+        /* ============ EXTERNAL PLAYER MATRIX ============ */
+        .os-pills {
+            display: flex;
+            gap: 6px;
+            padding: 4px 18px 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            margin-bottom: 8px;
+        }
+
+        .os-pill {
+            flex: 1;
+            padding: 7px 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #b0b0c8;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .os-pill:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+        }
+
+        .os-pill.active {
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.45), rgba(168, 85, 247, 0.45));
+            border-color: rgba(165, 180, 252, 0.55);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+        }
+
+        .ext-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            padding: 2px 18px 10px;
+        }
+
+        .ext-pill {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            color: #e5e5f0;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: 12.5px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ext-pill:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.22);
+            transform: translateY(-1px);
+            color: #fff;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+        }
+
+        .ext-pill:active {
+            transform: scale(0.97);
+        }
+
+        .ext-pill svg, .ext-pill img {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            border-radius: 4px;
+        }
+
+        .ext-pill-info {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .ext-pill-name {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .ext-pill-desc {
+            font-size: 10.5px;
+            color: #8f8fa8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Toast notification */
+        #playerToast {
+            position: absolute;
+            top: calc(70px + env(safe-area-inset-top, 0px));
+            left: 50%;
+            transform: translateX(-50%) translateY(-12px) scale(0.95);
+            z-index: 99;
+            background: rgba(18, 18, 28, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.75), 0 0 1px rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-radius: 9999px;
+            padding: 9px 22px;
+            color: #fff;
+            font-size: 13.5px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.34, 1.3, 0.64, 1);
+        }
+
+        #playerToast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0) scale(1);
+        }
+
         .speed-pill,
         .aspect-pill {
             background: rgba(255, 255, 255, 0.09);
@@ -2842,6 +2975,11 @@
             <span id="fitBadgeText">Fit (100%)</span>
         </div>
 
+        <div id="playerToast">
+            <span id="playerToastIcon">⚡</span>
+            <span id="playerToastText">Notification</span>
+        </div>
+
         <div class="edge-slider" id="volEdge">
             <svg class="edge-icon" viewBox="0 0 24 24">
                 <path id="icoVolEdge"
@@ -3062,6 +3200,17 @@
                 <span class="switch"></span>
             </button>
 
+            <button class="dr-row" id="setBufferBoost">
+                <svg viewBox="0 0 24 24">
+                    <path d="M7 2v11h3v9l7-12h-4l4-8z" />
+                </svg>
+                <div style="display:flex;flex-direction:column;align-items:flex-start;flex:1;">
+                    <span style="font-weight:600;">Buffer Booster</span>
+                    <span style="font-size:11px;color:rgba(255,255,255,0.45);font-weight:400;">Pre-cache forward stream</span>
+                </div>
+                <span class="dr-val" id="bufferBoostVal" style="font-size:12px;color:#818cf8;font-weight:600;">⚡ Boost</span>
+            </button>
+
             <button class="dr-row" id="setLiquidGlass">
                 <svg viewBox="0 0 24 24">
                     <path
@@ -3140,6 +3289,133 @@
                 </label>
                 <div class="adj-btns">
                     <button id="bAdjReset" style="flex:1">⟲ Reset adjustments</button>
+                </div>
+            </div>
+
+            <button class="dr-row" data-expand="secPlayers" id="setPlayersRow">
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H8V4h12v12zm-7-2l5-4-5-4v8z"/>
+                </svg>
+                External Players
+                <span class="dr-val" id="playerOsBadge">Auto</span>
+                <svg class="dr-chev" viewBox="0 0 24 24">
+                    <path d="M7 10l5 5 5-5z" />
+                </svg>
+            </button>
+            <div class="dr-sec" id="secPlayers">
+                <div class="os-pills" id="playerOsPills">
+                    <button class="os-pill" data-os="android">Android</button>
+                    <button class="os-pill" data-os="ios">iOS / iPad</button>
+                    <button class="os-pill" data-os="desktop">PC / Mac</button>
+                </div>
+                <!-- Android Players Grid -->
+                <div class="ext-grid" id="extGridAndroid">
+                    <a class="ext-pill" id="extVlcAndroid" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#ff8800"><path d="M12 3L2 20h20L12 3zm0 5.5L18.5 18h-13L12 8.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">VLC</span>
+                            <span class="ext-pill-desc">Direct Intent</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extMxAndroid" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#0088ff"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">MX Player</span>
+                            <span class="ext-pill-desc">Free Edition</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extMxProAndroid" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#3b82f6"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">MX Pro</span>
+                            <span class="ext-pill-desc">Pro Edition</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extMpvAndroid" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#9333ea"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">MPV</span>
+                            <span class="ext-pill-desc">libmpv</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extNextAndroid" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#10b981"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">Next Player</span>
+                            <span class="ext-pill-desc">Material 3</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extJustAndroid" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#06b6d4"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">Just Player</span>
+                            <span class="ext-pill-desc">ExoPlayer</span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- iOS / iPadOS Players Grid -->
+                <div class="ext-grid" id="extGridIos" style="display:none;">
+                    <a class="ext-pill" id="extVlcIos" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#ff8800"><path d="M12 3L2 20h20L12 3zm0 5.5L18.5 18h-13L12 8.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">VLC</span>
+                            <span class="ext-pill-desc">vlc:// callback</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extInfuseIos" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#ec4899"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">Infuse 7</span>
+                            <span class="ext-pill-desc">Apple Silicon HDR</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extOutplayerIos" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#6366f1"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">Outplayer</span>
+                            <span class="ext-pill-desc">Fast Subtitles</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extNplayerIos" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#14b8a6"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">nPlayer</span>
+                            <span class="ext-pill-desc">DTS / Dolby</span>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- PC / Mac Players Grid -->
+                <div class="ext-grid" id="extGridDesktop" style="display:none;">
+                    <a class="ext-pill" id="extPotDesktop" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#eab308"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">PotPlayer</span>
+                            <span class="ext-pill-desc">Windows 64-bit</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extVlcDesktop" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#ff8800"><path d="M12 3L2 20h20L12 3zm0 5.5L18.5 18h-13L12 8.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">VLC</span>
+                            <span class="ext-pill-desc">vlc:// launcher</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extMpvDesktop" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#a855f7"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">MPV</span>
+                            <span class="ext-pill-desc">mpv:// launcher</span>
+                        </div>
+                    </a>
+                    <a class="ext-pill" id="extIinaDesktop" target="_blank" rel="noopener">
+                        <svg viewBox="0 0 24 24" fill="#38bdf8"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        <div class="ext-pill-info">
+                            <span class="ext-pill-name">IINA</span>
+                            <span class="ext-pill-desc">macOS native</span>
+                        </div>
+                    </a>
                 </div>
             </div>
 
@@ -3454,6 +3730,56 @@
             if (!url) return;
             const dUrl = url.includes('?') ? url + '&d=true' : url + '?d=true';
             if ($('setDownload')) $('setDownload').href = dUrl;
+
+            // Generate Deep Links for External Players Matrix
+            const rawTitle = cleanTitleFromUrl(url) || 'Video Stream';
+            const safeTitle = encodeURIComponent(rawTitle);
+            const encUrl = encodeURIComponent(url);
+
+            let scheme = 'https';
+            let bare = url;
+            try {
+                const parsed = new URL(url);
+                scheme = parsed.protocol.replace(':', '');
+                bare = parsed.host + parsed.pathname + parsed.search + parsed.hash;
+            } catch (e) { }
+
+            // Android Intents
+            const vlcIntent = `intent://${bare}#Intent;package=org.videolan.vlc;type=video/*;scheme=${scheme};S.title=${safeTitle};end`;
+            const mxIntent = `intent://${bare}#Intent;package=com.mxtech.videoplayer.ad;type=video/*;scheme=${scheme};S.title=${safeTitle};end`;
+            const mxProIntent = `intent://${bare}#Intent;package=com.mxtech.videoplayer.pro;type=video/*;scheme=${scheme};S.title=${safeTitle};end`;
+            const mpvIntent = `intent://${bare}#Intent;package=is.xyz.mpv;type=video/*;scheme=${scheme};S.title=${safeTitle};end`;
+            const nextIntent = `intent://${bare}#Intent;package=dev.anilbeesetti.nextplayer;type=video/*;scheme=${scheme};S.title=${safeTitle};end`;
+            const justIntent = `intent://${bare}#Intent;package=com.brouken.player;type=video/*;scheme=${scheme};S.title=${safeTitle};end`;
+
+            if ($('extVlcAndroid')) $('extVlcAndroid').href = vlcIntent;
+            if ($('extMxAndroid')) $('extMxAndroid').href = mxIntent;
+            if ($('extMxProAndroid')) $('extMxProAndroid').href = mxProIntent;
+            if ($('extMpvAndroid')) $('extMpvAndroid').href = mpvIntent;
+            if ($('extNextAndroid')) $('extNextAndroid').href = nextIntent;
+            if ($('extJustAndroid')) $('extJustAndroid').href = justIntent;
+
+            // iOS / iPadOS URLs
+            const vlcIos = `vlc-x-callback://x-callback-url/stream?url=${encUrl}`;
+            const infuseIos = `infuse://x-callback-url/play?url=${encUrl}`;
+            const outplayerIos = `outplayer://${url.replace(/^https?:\/\//i, '')}`;
+            const nplayerIos = `nplayer-${url}`;
+
+            if ($('extVlcIos')) $('extVlcIos').href = vlcIos;
+            if ($('extInfuseIos')) $('extInfuseIos').href = infuseIos;
+            if ($('extOutplayerIos')) $('extOutplayerIos').href = outplayerIos;
+            if ($('extNplayerIos')) $('extNplayerIos').href = nplayerIos;
+
+            // PC / Mac URLs
+            const potDesktop = `potplayer://${url}`;
+            const vlcDesktop = `vlc://${url}`;
+            const mpvDesktop = `mpv://${url}`;
+            const iinaDesktop = `iina://weblink?url=${encUrl}`;
+
+            if ($('extPotDesktop')) $('extPotDesktop').href = potDesktop;
+            if ($('extVlcDesktop')) $('extVlcDesktop').href = vlcDesktop;
+            if ($('extMpvDesktop')) $('extMpvDesktop').href = mpvDesktop;
+            if ($('extIinaDesktop')) $('extIinaDesktop').href = iinaDesktop;
         }
 
         function scheduleMetadataInspection(url) {
@@ -3695,7 +4021,30 @@
 
             // 5. Connect stream to video element and trigger explicit resource loading
             const effectiveSrc = getEffectiveStreamUrl(streamUrl);
-            video.src = effectiveSrc;
+            while (video.firstChild) {
+                video.removeChild(video.firstChild);
+            }
+            const isMkv = /\.mkv(\?.*)?$/i.test(effectiveSrc) || /\.mkv(\?.*)?$/i.test(streamUrl);
+            if (isMkv) {
+                // Universal MKV Playback Trick:
+                // Chromium and mobile WebViews block direct MKV assignment or fail to demux MKV container.
+                // Injecting <source type="video/mp4"> causes browser hardware pipeline to inspect
+                // the inner AVC/H.264 & AAC tracks directly, enabling native hardware playback!
+                const sourceMp4 = document.createElement('source');
+                sourceMp4.src = effectiveSrc;
+                sourceMp4.type = 'video/mp4';
+                video.appendChild(sourceMp4);
+
+                const sourceMkv = document.createElement('source');
+                sourceMkv.src = effectiveSrc;
+                sourceMkv.type = 'video/x-matroska';
+                video.appendChild(sourceMkv);
+
+                video.removeAttribute('src');
+            } else {
+                video.removeAttribute('src');
+                video.src = effectiveSrc;
+            }
             video.load();
 
             // 6. Resume position if saved
@@ -4391,6 +4740,80 @@
                         video.addEventListener('loadedmetadata', () => { video.currentTime = savedTime; }, { once: true });
                     }
                 }
+            });
+        }
+
+        /* ============ APPLE GLASS PLAYER TOAST ============ */
+        let playerToastTimer = null;
+        function showToast(msg, icon = '✨') {
+            const toast = $('playerToast');
+            if (!toast) return;
+            const iconEl = $('playerToastIcon');
+            const textEl = $('playerToastText');
+            if (iconEl) iconEl.textContent = icon;
+            if (textEl) textEl.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(playerToastTimer);
+            playerToastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2400);
+        }
+
+        /* ============ BUFFER BOOSTER (Forward Range Pre-caching) ============ */
+        let isBoosting = false;
+        async function triggerBufferBoost() {
+            if (!streamUrl) {
+                showToast('No stream loaded to buffer', '⚠️');
+                return;
+            }
+            if (isBoosting) return;
+            isBoosting = true;
+
+            const boostVal = $('bufferBoostVal');
+            if (boostVal) boostVal.textContent = '⏳ Buffering…';
+            showToast('🚀 Pre-buffering forward stream...', '⚡');
+
+            try {
+                // 1. Force browser media element to actively request lookahead chunks
+                if (video && !isNaN(video.currentTime)) {
+                    const originalTime = video.currentTime;
+                    if (!video.seeking && video.readyState >= 1) {
+                        video.currentTime = Math.min(video.duration || Infinity, originalTime + 0.1);
+                        setTimeout(() => {
+                            if (Math.abs(video.currentTime - (originalTime + 0.1)) < 0.25) {
+                                video.currentTime = originalTime;
+                            }
+                        }, 50);
+                    }
+                }
+
+                // 2. Fetch forward Range chunk (8MB lookahead) to prime edge CDN / browser socket cache
+                const effectiveSrc = getEffectiveStreamUrl(streamUrl);
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 4500);
+
+                await fetch(effectiveSrc, {
+                    headers: { 'Range': 'bytes=0-8388608' },
+                    signal: controller.signal
+                }).catch(() => {});
+                clearTimeout(timeoutId);
+
+                if (boostVal) boostVal.textContent = '✅ Boosted';
+                showToast('Stream boosted! Lookahead buffered.', '🚀');
+                setTimeout(() => {
+                    if (boostVal) boostVal.textContent = '⚡ Boost';
+                    isBoosting = false;
+                }, 3000);
+            } catch (err) {
+                if (boostVal) boostVal.textContent = '⚡ Boost';
+                isBoosting = false;
+            }
+        }
+
+        const setBufferBoost = $('setBufferBoost');
+        if (setBufferBoost) {
+            setBufferBoost.addEventListener('click', () => {
+                triggerBufferBoost();
             });
         }
 
@@ -5407,6 +5830,40 @@
                 .catch(() => $('vlcCopyStatus').textContent = 'Copy failed — use Direct link.');
             openModal('vlcModal');
         });
+
+        /* ================= EXTERNAL PLAYER MATRIX TABS ================= */
+        function setPlayerPlatformTab(platform) {
+            const pills = document.querySelectorAll('#playerOsPills .os-pill');
+            pills.forEach(p => p.classList.toggle('active', p.dataset.os === platform));
+
+            if ($('extGridAndroid')) $('extGridAndroid').style.display = platform === 'android' ? 'grid' : 'none';
+            if ($('extGridIos')) $('extGridIos').style.display = platform === 'ios' ? 'grid' : 'none';
+            if ($('extGridDesktop')) $('extGridDesktop').style.display = platform === 'desktop' ? 'grid' : 'none';
+
+            const badge = $('playerOsBadge');
+            if (badge) {
+                badge.textContent = platform === 'android' ? 'Android' : (platform === 'ios' ? 'iOS' : 'PC / Mac');
+            }
+        }
+
+        document.querySelectorAll('#playerOsPills .os-pill').forEach(pill => {
+            pill.addEventListener('click', (e) => {
+                e.stopPropagation();
+                setPlayerPlatformTab(pill.dataset.os);
+            });
+        });
+
+        document.querySelectorAll('.ext-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                closeDrawer();
+                const nameEl = pill.querySelector('.ext-pill-name');
+                const appName = nameEl ? nameEl.textContent : 'App';
+                showToast(`Launching ${appName}...`, '🚀');
+            });
+        });
+
+        // Auto-select detected device OS
+        setPlayerPlatformTab(detectPlatform());
 
         /* ================= MX PLAYER-STYLE GESTURES =================
            pointer events cover touch + mouse.
