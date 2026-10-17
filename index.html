@@ -2078,9 +2078,7 @@
             position: absolute;
             inset: 0;
             z-index: 45;
-            background: rgba(4, 4, 10, 0.72);
-            backdrop-filter: blur(16px) saturate(140%);
-            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            background: rgba(0, 0, 0, 0.35);
             display: none;
             align-items: center;
             justify-content: center;
@@ -2098,17 +2096,17 @@
         }
 
         @keyframes modalPopUp {
-            from { opacity: 0; transform: scale(0.92) translateY(8px); }
+            from { opacity: 0; transform: scale(0.95) translateY(6px); }
             to { opacity: 1; transform: scale(1) translateY(0); }
         }
 
         .modal {
-            background: rgba(18, 18, 28, 0.88);
-            backdrop-filter: blur(28px) saturate(160%);
-            -webkit-backdrop-filter: blur(28px) saturate(160%);
-            border: 1px solid rgba(255, 255, 255, 0.14);
-            border-radius: 18px;
-            box-shadow: 0 28px 70px rgba(0, 0, 0, 0.75), 0 0 1px 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+            background: rgba(14, 14, 20, 0.65);
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
             width: 100%;
             max-width: 440px;
             max-height: 85%;
