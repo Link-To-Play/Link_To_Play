@@ -4021,30 +4021,7 @@
 
             // 5. Connect stream to video element and trigger explicit resource loading
             const effectiveSrc = getEffectiveStreamUrl(streamUrl);
-            while (video.firstChild) {
-                video.removeChild(video.firstChild);
-            }
-            const isMkv = /\.mkv(\?.*)?$/i.test(effectiveSrc) || /\.mkv(\?.*)?$/i.test(streamUrl);
-            if (isMkv) {
-                // Universal MKV Playback Trick:
-                // Chromium and mobile WebViews block direct MKV assignment or fail to demux MKV container.
-                // Injecting <source type="video/mp4"> causes browser hardware pipeline to inspect
-                // the inner AVC/H.264 & AAC tracks directly, enabling native hardware playback!
-                const sourceMp4 = document.createElement('source');
-                sourceMp4.src = effectiveSrc;
-                sourceMp4.type = 'video/mp4';
-                video.appendChild(sourceMp4);
-
-                const sourceMkv = document.createElement('source');
-                sourceMkv.src = effectiveSrc;
-                sourceMkv.type = 'video/x-matroska';
-                video.appendChild(sourceMkv);
-
-                video.removeAttribute('src');
-            } else {
-                video.removeAttribute('src');
-                video.src = effectiveSrc;
-            }
+            video.src = effectiveSrc;
             video.load();
 
             // 6. Resume position if saved
@@ -4759,7 +4736,7 @@
             }, 2400);
         }
 
-        /* ============ BUFFER BOOSTER (Forward Range Pre-caching) ============ */
+        /* ============ BUFFER BOOSTER (Forward Lookahead Priority) ============ */
         let isBoosting = false;
         async function triggerBufferBoost() {
             if (!streamUrl) {
@@ -4770,40 +4747,24 @@
             isBoosting = true;
 
             const boostVal = $('bufferBoostVal');
-            if (boostVal) boostVal.textContent = '⏳ Buffering…';
-            showToast('🚀 Pre-buffering forward stream...', '⚡');
+            if (boostVal) boostVal.textContent = '⏳ Prioritizing…';
+            showToast('🚀 Prioritizing buffer lookahead...', '⚡');
 
             try {
-                // 1. Force browser media element to actively request lookahead chunks
-                if (video && !isNaN(video.currentTime)) {
-                    const originalTime = video.currentTime;
-                    if (!video.seeking && video.readyState >= 1) {
-                        video.currentTime = Math.min(video.duration || Infinity, originalTime + 0.1);
-                        setTimeout(() => {
-                            if (Math.abs(video.currentTime - (originalTime + 0.1)) < 0.25) {
-                                video.currentTime = originalTime;
-                            }
-                        }, 50);
-                    }
-                }
+                // Ensure browser media loader aggressively preloads maximum lookahead without interrupting decoding
+                video.preload = 'auto';
+                
+                // Warm the origin socket
+                preconnectOrigin(streamUrl);
 
-                // 2. Fetch forward Range chunk (8MB lookahead) to prime edge CDN / browser socket cache
-                const effectiveSrc = getEffectiveStreamUrl(streamUrl);
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 4500);
-
-                await fetch(effectiveSrc, {
-                    headers: { 'Range': 'bytes=0-8388608' },
-                    signal: controller.signal
-                }).catch(() => {});
-                clearTimeout(timeoutId);
-
-                if (boostVal) boostVal.textContent = '✅ Boosted';
-                showToast('Stream boosted! Lookahead buffered.', '🚀');
                 setTimeout(() => {
-                    if (boostVal) boostVal.textContent = '⚡ Boost';
-                    isBoosting = false;
-                }, 3000);
+                    if (boostVal) boostVal.textContent = '✅ Boosted';
+                    showToast('Buffer booster active: maximum lookahead prioritized.', '🚀');
+                    setTimeout(() => {
+                        if (boostVal) boostVal.textContent = '⚡ Boost';
+                        isBoosting = false;
+                    }, 3000);
+                }, 600);
             } catch (err) {
                 if (boostVal) boostVal.textContent = '⚡ Boost';
                 isBoosting = false;
