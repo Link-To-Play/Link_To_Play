@@ -1,0 +1,8 @@
+.git/
+.wrangler/
+scratch/
+prompt change/
+*.md
+*.html
+!index.html
+!manifest.json
