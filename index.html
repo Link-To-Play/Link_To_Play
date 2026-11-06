@@ -832,6 +832,262 @@
             box-shadow: 0 2px 10px rgba(229, 9, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
         }
 
+        /* ============ AUDIO TRACK SELECTOR POPUP (VisionOS Liquid Glass) ============ */
+        #audioTrackWrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #audioTrackBtn {
+            position: relative;
+        }
+
+        #audioTrackBtn.dolby-active::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 7px;
+            height: 7px;
+            background: #10b981;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #10b981;
+            pointer-events: none;
+        }
+
+        #audioTrackPop {
+            position: absolute;
+            bottom: 56px;
+            right: -24px;
+            transform: translateY(8px) scale(0.92);
+            transform-origin: bottom right;
+            background: rgba(18, 18, 26, 0.90);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            padding: 12px 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
+            display: none !important;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 60;
+            width: 250px;
+            max-height: 280px;
+            overflow-y: auto;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #audioTrackWrap.open #audioTrackPop {
+            display: flex !important;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .at-track-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .at-track-pill {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e2e8f0;
+            border-radius: 12px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .at-track-pill:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #fff;
+            transform: scale(1.01);
+        }
+
+        .at-track-pill:active {
+            transform: scale(0.97);
+        }
+
+        .at-track-pill.active {
+            background: rgba(229, 9, 20, 0.95);
+            border-color: #ff3344;
+            color: #fff;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(229, 9, 20, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .at-pill-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .at-pill-name {
+            font-size: 12.5px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .at-pill-meta {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .at-track-pill.active .at-pill-meta {
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .at-pill-check {
+            font-size: 13px;
+            font-weight: 700;
+            opacity: 0;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+
+        .at-track-pill.active .at-pill-check {
+            opacity: 1;
+        }
+
+        .at-empty-note {
+            font-size: 11.5px;
+            color: rgba(255, 255, 255, 0.55);
+            text-align: center;
+            padding: 10px 4px;
+        }
+
+        /* ============ DOLBY AUDIO FALLBACK NOTIFICATION TOAST ============ */
+        .dolby-prompt {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-24px);
+            background: rgba(24, 24, 32, 0.92);
+            backdrop-filter: blur(24px) saturate(190%);
+            -webkit-backdrop-filter: blur(24px) saturate(190%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 18px;
+            box-shadow: 0 16px 44px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            padding: 10px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            z-index: 2500;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            max-width: calc(100% - 32px);
+        }
+
+        .dolby-prompt.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+            pointer-events: auto;
+        }
+
+        .dp-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .dp-icon {
+            width: 20px;
+            height: 20px;
+            fill: #f59e0b;
+            flex-shrink: 0;
+        }
+
+        .dp-text {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            font-size: 11.5px;
+            color: #cbd5e1;
+            line-height: 1.35;
+        }
+
+        .dp-text strong {
+            color: #ffffff;
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+
+        .dp-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .dp-btn-vlc {
+            background: rgba(229, 9, 20, 0.92);
+            border: 1px solid #ff3344;
+            color: #fff;
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.15s ease;
+        }
+
+        .dp-btn-vlc:hover {
+            background: #ff1f2d;
+            box-shadow: 0 2px 10px rgba(229, 9, 20, 0.5);
+        }
+
+        .dp-btn-close {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 12px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .dp-btn-close:hover {
+            background: rgba(255, 255, 255, 0.22);
+            color: #fff;
+        }
+
         /* ============ APPLE SPOKE LOADER ============ */
         #spinner {
             position: absolute;
@@ -1149,6 +1405,12 @@
                 display: none !important;
             }
 
+            #audioTrackWrap,
+            #audioTrackBtn {
+                order: 5.5;
+                padding: 4px 6px;
+            }
+
             #aspectWrap,
             #aspectBtn {
                 order: 6;
@@ -1220,6 +1482,8 @@
         #stage.layout-mobile #timeRemaining { order: 4; font-size: 11.5px; font-weight: 600; margin-right: auto; }
         #stage.layout-mobile #volWrap { display: flex !important; order: 5; }
         #stage.layout-mobile #pipBtn { display: none !important; }
+        #stage.layout-mobile #audioTrackWrap,
+        #stage.layout-mobile #audioTrackBtn { order: 5.5; padding: 4px 6px; }
         #stage.layout-mobile #aspectWrap,
         #stage.layout-mobile #aspectBtn { order: 6; padding: 4px 6px; }
         #stage.layout-mobile #setBtn { order: 7; padding: 4px 6px; }
@@ -1253,6 +1517,8 @@
         #stage.layout-tablet #timeRemaining { order: unset; font-size: 11.5px; margin-right: 0; }
         #stage.layout-tablet #volWrap { display: flex !important; order: unset; }
         #stage.layout-tablet #pipBtn { display: none !important; }
+        #stage.layout-tablet #audioTrackWrap,
+        #stage.layout-tablet #audioTrackBtn { order: unset; }
         #stage.layout-tablet #aspectWrap,
         #stage.layout-tablet #aspectBtn { order: unset; }
         #stage.layout-tablet #setBtn { order: unset; }
@@ -1287,6 +1553,8 @@
         #stage.layout-desktop #timeRemaining { order: unset; font-size: 12.5px; font-weight: 500; margin-right: 0; }
         #stage.layout-desktop #volWrap { display: flex !important; order: unset; }
         #stage.layout-desktop #pipBtn { display: flex !important; order: unset; }
+        #stage.layout-desktop #audioTrackWrap,
+        #stage.layout-desktop #audioTrackBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #aspectWrap,
         #stage.layout-desktop #aspectBtn { order: unset; padding: 6px; }
         #stage.layout-desktop #setBtn { order: unset; padding: 6px; }
@@ -3271,6 +3539,24 @@
             <span class="time-label" id="timeRemaining" title="Click to toggle remaining / total">-0:00</span>
             <span id="timeLabel" style="display:none">0:00 / 0:00</span>
 
+            <!-- 5.5 Audio Track Selector with VisionOS Glass Quick Picker -->
+            <div id="audioTrackWrap">
+                <button class="ctl-btn" id="audioTrackBtn" aria-label="Audio Track" title="Audio Track (Audio Selector)">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+                    </svg>
+                </button>
+                <div id="audioTrackPop">
+                    <div class="ap-header">
+                        <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+                        <span>Audio Tracks</span>
+                    </div>
+                    <div class="at-track-list" id="audioTrackList">
+                        <div class="at-empty-note">Scanning audio tracks…</div>
+                    </div>
+                </div>
+            </div>
+
             <!-- 6. Screen Fit / Aspect Ratio Wrap with VisionOS Glass Quick Picker -->
             <div id="aspectWrap">
                 <button class="ctl-btn" id="aspectBtn" aria-label="Screen Fit" title="Screen Fit / Aspect Ratio (Z)">
@@ -3670,6 +3956,23 @@
                     <a class="dr-row" id="vlcInstall" href="#" target="_blank" rel="noopener"></a>
                 </div>
                 <div id="vlcCopyStatus"></div>
+            </div>
+        </div>
+
+        <!-- ============ DOLBY AUDIO FALLBACK NOTIFICATION TOAST ============ -->
+        <div class="dolby-prompt" id="dolbyPrompt">
+            <div class="dp-content">
+                <svg viewBox="0 0 24 24" class="dp-icon">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                </svg>
+                <div class="dp-text">
+                    <strong>Dolby Audio detected.</strong>
+                    <span>If no sound plays in Chrome, open in VLC or external player.</span>
+                </div>
+            </div>
+            <div class="dp-actions">
+                <button class="dp-btn-vlc" id="dpVlcBtn">Open in VLC</button>
+                <button class="dp-btn-close" id="dpCloseBtn" aria-label="Close">✕</button>
             </div>
         </div>
     </div>
@@ -4162,6 +4465,10 @@
                 return;
             }
 
+            if (window.clientAudioEngine) {
+                clientAudioEngine.reset();
+            }
+
             advanceLoader();
             showSpinner();
             metadataInspected = false;
@@ -4261,7 +4568,14 @@
                                 hideSpinner(true);
                                 // Unmute on first user touch, click, or key anywhere on screen
                                 const unmute = () => {
-                                    video.muted = false;
+                                    if (window.clientAudioEngine && clientAudioEngine.active) {
+                                        clientAudioEngine.initAudioContext();
+                                        if (clientAudioEngine.audioCtx && clientAudioEngine.audioCtx.state === 'suspended') {
+                                            clientAudioEngine.audioCtx.resume();
+                                        }
+                                    } else {
+                                        video.muted = false;
+                                    }
                                     window.removeEventListener('click', unmute, true);
                                     window.removeEventListener('touchstart', unmute, true);
                                     window.removeEventListener('keydown', unmute, true);
@@ -4805,11 +5119,20 @@
         const ICON_LOW = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z';
         const ICON_FULL = 'M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z';
         let lastVol = 100;
+        let isAudioMuted = false;
         function setVolume(pct) {                     /* pct 0-100, single source of truth */
             pct = Math.max(0, Math.min(100, Math.round(pct)));
             if (pct > 0) lastVol = pct;
-            video.volume = pct / 100;
-            video.muted = pct === 0;
+            isAudioMuted = (pct === 0);
+
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                video.muted = true; // Silence native video so silent track doesn't conflict
+                clientAudioEngine.setVolume(pct / 100, pct === 0);
+            } else {
+                video.volume = pct / 100;
+                video.muted = pct === 0;
+            }
+
             volFill.style.height = pct + '%';
             volThumb.style.bottom = pct + '%';
             volPct.textContent = pct;
@@ -4855,6 +5178,8 @@
         document.addEventListener('click', e => {
             if (!volWrap.contains(e.target)) volWrap.classList.remove('open');
             if (aspectWrap && !aspectWrap.contains(e.target)) aspectWrap.classList.remove('open');
+            const aWrap = $('audioTrackWrap');
+            if (aWrap && !aWrap.contains(e.target)) aWrap.classList.remove('open');
         });
 
         let isBooting = true;
@@ -4864,6 +5189,7 @@
         /* Native volume change listener (fires on hardware buttons, media keys, bluetooth devices) */
         video.addEventListener('volumechange', () => {
             if (isBooting || isControlHubChangingVolume) return;
+            if (window.clientAudioEngine && clientAudioEngine.active) return;
             const pct = video.muted ? 0 : Math.round(video.volume * 100);
             volFill.style.height = pct + '%';
             volThumb.style.bottom = pct + '%';
@@ -5237,6 +5563,636 @@
             btn.addEventListener('click', () => {
                 setFitMode(btn.dataset.fit, true);
             });
+        });
+
+        /* ================= AUDIO TRACK SELECTOR & CLIENT-SIDE DOLBY ENGINE ================= */
+        const audioTrackWrap = $('audioTrackWrap');
+        const audioTrackBtn = $('audioTrackBtn');
+        const audioTrackList = $('audioTrackList');
+
+        function toggleAudioTrackPop(force) {
+            if (!audioTrackWrap) return;
+            const isOpen = audioTrackWrap.classList.contains('open');
+            const next = typeof force === 'boolean' ? force : !isOpen;
+            if (next && aspectWrap) aspectWrap.classList.remove('open');
+            if (next && volWrap) volWrap.classList.remove('open');
+            audioTrackWrap.classList.toggle('open', next);
+            if (next) wakeUI(5000);
+        }
+
+        if (audioTrackBtn) {
+            const onAudioTrackTrigger = e => {
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable && e.type === 'touchend') e.preventDefault();
+                }
+                toggleAudioTrackPop();
+                wakeUI(5000);
+            };
+            audioTrackBtn.addEventListener('click', onAudioTrackTrigger);
+            audioTrackBtn.addEventListener('touchend', onAudioTrackTrigger, { passive: false });
+        }
+
+        function showAudioToast(msg) {
+            if (typeof updateCapsuleHud === 'function') {
+                const audioIconPath = 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z';
+                updateCapsuleHud(audioIconPath, 100, msg);
+            }
+        }
+
+        function renderAudioTrackUI(tracks, activeIndex) {
+            if (!audioTrackList) return;
+            if (!tracks || tracks.length === 0) {
+                audioTrackList.innerHTML = '<div class="at-empty-note">Default Audio Stream (AAC Stereo)</div>';
+                return;
+            }
+
+            let html = '';
+            tracks.forEach((t, idx) => {
+                const isActive = idx === activeIndex;
+                const lang = t.lang || t.name || `Track ${idx + 1}`;
+                const codec = t.codec || 'AAC';
+                const channels = t.channels || 'Stereo';
+                const extra = [codec, channels].filter(Boolean).join(' • ');
+
+                html += `
+                    <button class="at-track-pill ${isActive ? 'active' : ''}" data-track-index="${idx}">
+                        <div class="at-pill-info">
+                            <span class="at-pill-name">${escapeHtml(lang)}</span>
+                            <span class="at-pill-meta">${escapeHtml(extra)}</span>
+                        </div>
+                        <span class="at-pill-check">✓</span>
+                    </button>
+                `;
+            });
+            audioTrackList.innerHTML = html;
+
+            const onPillSelect = e => {
+                const btn = e.target.closest('.at-track-pill');
+                if (!btn) return;
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable && e.type === 'touchend') e.preventDefault();
+                }
+                const idx = parseInt(btn.dataset.trackIndex, 10);
+                if (window.clientAudioEngine) {
+                    clientAudioEngine.selectTrack(idx);
+                }
+                toggleAudioTrackPop(false);
+                wakeUI(3500);
+            };
+
+            audioTrackList.querySelectorAll('.at-track-pill').forEach(btn => {
+                btn.addEventListener('click', onPillSelect);
+                btn.addEventListener('touchend', onPillSelect, { passive: false });
+            });
+
+            // Also render in Settings Drawer (#audioPills)
+            const pills = $('audioPills');
+            if (pills) {
+                pills.innerHTML = html;
+                pills.querySelectorAll('.at-track-pill').forEach(btn => {
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        const idx = parseInt(btn.dataset.trackIndex, 10);
+                        if (window.clientAudioEngine) {
+                            clientAudioEngine.selectTrack(idx);
+                        }
+                    });
+                });
+            }
+        }
+
+        // Dolby Audio Fallback Toast
+        function showDolbyFallbackPrompt() {
+            const prompt = $('dolbyPrompt');
+            if (!prompt) return;
+            prompt.classList.add('show');
+            clearTimeout(prompt._timer);
+            prompt._timer = setTimeout(() => {
+                prompt.classList.remove('show');
+            }, 10000);
+        }
+
+        function hideDolbyFallbackPrompt() {
+            const prompt = $('dolbyPrompt');
+            if (!prompt) return;
+            prompt.classList.remove('show');
+            clearTimeout(prompt._timer);
+        }
+
+        const dpVlcBtn = $('dpVlcBtn');
+        if (dpVlcBtn) {
+            dpVlcBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                hideDolbyFallbackPrompt();
+                if (typeof openVlcModal === 'function') openVlcModal();
+            });
+        }
+        const dpCloseBtn = $('dpCloseBtn');
+        if (dpCloseBtn) {
+            dpCloseBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                hideDolbyFallbackPrompt();
+            });
+        }
+
+        // Lazy Multi-CDN Decoder Module Loader
+        let cachedDecoderModules = null;
+        let decoderModuleLoadPromise = null;
+
+        async function loadDecoderModules() {
+            if (cachedDecoderModules) return cachedDecoderModules;
+            if (decoderModuleLoadPromise) return decoderModuleLoadPromise;
+
+            decoderModuleLoadPromise = (async () => {
+                const cdnCandidates = [
+                    {
+                        core: 'https://cdn.jsdelivr.net/npm/mediabunny@1.65.2/+esm',
+                        ac3: 'https://cdn.jsdelivr.net/npm/@mediabunny/ac3@1.65.2/+esm',
+                        dts: 'https://cdn.jsdelivr.net/npm/@mediabunny/dts@1.65.2/+esm'
+                    },
+                    {
+                        core: 'https://esm.sh/mediabunny@1.65.2',
+                        ac3: 'https://esm.sh/@mediabunny/ac3@1.65.2',
+                        dts: 'https://esm.sh/@mediabunny/dts@1.65.2'
+                    }
+                ];
+
+                let lastErr = null;
+                for (const cdn of cdnCandidates) {
+                    try {
+                        const [mb, ac3, dts] = await Promise.all([
+                            import(/* webpackIgnore: true */ cdn.core),
+                            import(/* webpackIgnore: true */ cdn.ac3),
+                            import(/* webpackIgnore: true */ cdn.dts)
+                        ]);
+
+                        if (mb && ac3 && dts) {
+                            if (typeof ac3.registerAc3Decoder === 'function') ac3.registerAc3Decoder();
+                            if (typeof dts.registerDtsDecoder === 'function') dts.registerDtsDecoder();
+                            cachedDecoderModules = { mediabunny: mb, ac3, dts };
+                            return cachedDecoderModules;
+                        }
+                    } catch (e) {
+                        console.warn('[AudioEngine] CDN source failed, trying next:', cdn.core, e);
+                        lastErr = e;
+                    }
+                }
+                throw lastErr || new Error('All WebAssembly audio decoder CDNs failed to load.');
+            })();
+
+            try {
+                return await decoderModuleLoadPromise;
+            } finally {
+                decoderModuleLoadPromise = null;
+            }
+        }
+
+        // Client-Side Audio Engine
+        window.clientAudioEngine = {
+            audioCtx: null,
+            masterGain: null,
+            active: false,
+            loading: false,
+            selectedTrackIndex: 0,
+            audioTracks: [],
+            
+            mediabunnyInput: null,
+            mediabunnyTracks: [],
+            currentSourceUrl: '',
+            audioSink: null,
+            
+            decodeGeneration: 0,
+            activeNodes: new Set(),
+            nextScheduledTime: 0,
+            lastSampleEndPTS: -1,
+            
+            initAudioContext() {
+                if (!this.audioCtx) {
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (AudioContextClass) {
+                        this.audioCtx = new AudioContextClass();
+                        this.masterGain = this.audioCtx.createGain();
+                        this.masterGain.connect(this.audioCtx.destination);
+                        this.syncVolume();
+                    }
+                }
+                return this.audioCtx;
+            },
+            
+            syncVolume() {
+                if (!this.masterGain || !this.audioCtx) return;
+                const vol = (isAudioMuted || (typeof lastVol === 'number' && lastVol === 0)) ? 0 : ((typeof lastVol === 'number' ? lastVol : 100) / 100);
+                try {
+                    this.masterGain.gain.setValueAtTime(vol, this.audioCtx.currentTime);
+                } catch (e) {
+                    this.masterGain.gain.value = vol;
+                }
+            },
+            
+            setVolume(pct, muted) {
+                if (!this.masterGain || !this.audioCtx) return;
+                const vol = muted ? 0 : Math.max(0, Math.min(1, pct));
+                try {
+                    this.masterGain.gain.setValueAtTime(vol, this.audioCtx.currentTime);
+                } catch (e) {
+                    this.masterGain.gain.value = vol;
+                }
+            },
+            
+            isDolbyOrDts(codec) {
+                if (!codec) return false;
+                return /^(ac-?3|e-?ac-?3|ec-?3|dd\+|dts|truehd|dolby)/i.test(codec.trim());
+            },
+            
+            setTracks(tracks) {
+                this.audioTracks = (tracks || []).map((t, idx) => ({
+                    index: idx,
+                    codec: t.codec || 'AAC',
+                    lang: t.lang || t.name || `Track ${idx + 1}`,
+                    name: t.name || t.lang || `Track ${idx + 1}`,
+                    channels: t.channels || 'Stereo',
+                    sampleRate: t.sampleRate || '48 kHz',
+                    bitRate: t.bitRate || '',
+                    isDolby: this.isDolbyOrDts(t.codec)
+                }));
+                
+                renderAudioTrackUI(this.audioTracks, this.selectedTrackIndex);
+                
+                if (this.audioTracks.length > 0) {
+                    const track0 = this.audioTracks[0];
+                    if (track0.isDolby) {
+                        console.log(`[AudioEngine] Dolby track detected (${track0.codec}), activating client-side decoder.`);
+                        this.selectTrack(0);
+                    } else {
+                        console.log(`[AudioEngine] Native audio codec detected (${track0.codec}), zero WASM overhead.`);
+                        this.deactivate();
+                    }
+                }
+            },
+            
+            async selectTrack(index) {
+                if (index < 0 || index >= this.audioTracks.length) return;
+                this.selectedTrackIndex = index;
+                mediaFileInfo.activeAudioIndex = index;
+                const track = this.audioTracks[index];
+                
+                renderAudioTrackUI(this.audioTracks, index);
+                
+                // If user selected Track 0 and it's standard native AAC/MP3:
+                if (index === 0 && !track.isDolby) {
+                    this.deactivate();
+                    if (typeof showAudioToast === 'function') {
+                        showAudioToast(`${track.lang} [Native ${track.codec}]`);
+                    }
+                    return;
+                }
+                
+                // Otherwise, activate WASM Web Audio engine for this track
+                await this.activateTrack(index);
+            },
+            
+            async activateTrack(index) {
+                const track = this.audioTracks[index];
+                if (!track) return;
+                
+                const trackLabel = `${track.lang} [${track.codec} ${track.channels}]`;
+                if (typeof showAudioToast === 'function') {
+                    showAudioToast(trackLabel);
+                }
+                
+                try {
+                    this.loading = true;
+                    this.initAudioContext();
+                    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                        try { await this.audioCtx.resume(); } catch (e) {}
+                    }
+                    
+                    const btn = $('audioTrackBtn');
+                    if (btn) btn.classList.add('dolby-active');
+                    
+                    const modules = await loadDecoderModules();
+                    const { mediabunny } = modules;
+                    
+                    if (!this.mediabunnyInput || this.currentSourceUrl !== streamUrl) {
+                        this.currentSourceUrl = streamUrl;
+                        let srcUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(streamUrl) : streamUrl;
+                        
+                        try {
+                            const source = new mediabunny.UrlSource(srcUrl);
+                            this.mediabunnyInput = new mediabunny.Input({
+                                source,
+                                formats: mediabunny.ALL_FORMATS
+                            });
+                            this.mediabunnyTracks = await this.mediabunnyInput.getAudioTracks();
+                        } catch (urlErr) {
+                            if (!srcUrl.startsWith('/api/proxy') && !srcUrl.includes('/api/proxy?url=')) {
+                                srcUrl = `/api/proxy?url=${encodeURIComponent(streamUrl)}`;
+                                const source = new mediabunny.UrlSource(srcUrl);
+                                this.mediabunnyInput = new mediabunny.Input({
+                                    source,
+                                    formats: mediabunny.ALL_FORMATS
+                                });
+                                this.mediabunnyTracks = await this.mediabunnyInput.getAudioTracks();
+                            } else {
+                                throw urlErr;
+                            }
+                        }
+                    }
+                    
+                    const mbTrack = this.mediabunnyTracks[index] || this.mediabunnyTracks[0];
+                    if (!mbTrack) throw new Error('No audio track available in demuxer');
+                    
+                    this.audioSink = new mediabunny.AudioSampleSink(mbTrack);
+                    this.active = true;
+                    this.loading = false;
+                    
+                    // Silence native video so silent track doesn't conflict
+                    video.muted = true;
+                    this.syncVolume();
+                    
+                    this.stopAllScheduledNodes();
+                    this.startDecodeLoop(video.currentTime || 0);
+                    
+                    const note = $('audioNote');
+                    if (note) {
+                        note.innerHTML = `Dolby Audio Decoder active: <strong>${escapeHtml(track.lang)} [${escapeHtml(track.codec)} ${escapeHtml(track.channels)}]</strong> (Client-Side WASM).`;
+                    }
+                } catch (err) {
+                    console.error('[AudioEngine] Activation failed:', err);
+                    this.handleFailure(err);
+                } finally {
+                    this.loading = false;
+                }
+            },
+            
+            async startDecodeLoop(startTime) {
+                if (!this.audioSink || !this.audioCtx) return;
+                const currentGen = ++this.decodeGeneration;
+                this.nextScheduledTime = 0;
+                this.lastSampleEndPTS = -1;
+                
+                try {
+                    for await (const sample of this.audioSink.samples(startTime)) {
+                        if (currentGen !== this.decodeGeneration) {
+                            try { sample.close(); } catch (e) {}
+                            break;
+                        }
+                        
+                        // Flow control: keep 3 to 4 seconds buffered ahead of video
+                        while (!video.paused && sample.timestamp > (video.currentTime || 0) + 3.5) {
+                            await new Promise(r => setTimeout(r, 180));
+                            if (currentGen !== this.decodeGeneration) {
+                                try { sample.close(); } catch (e) {}
+                                return;
+                            }
+                        }
+                        
+                        if (currentGen !== this.decodeGeneration) {
+                            try { sample.close(); } catch (e) {}
+                            break;
+                        }
+                        
+                        this.scheduleSample(sample);
+                    }
+                } catch (iterErr) {
+                    if (currentGen === this.decodeGeneration) {
+                        console.warn('[AudioEngine] Decode stream error:', iterErr);
+                    }
+                }
+            },
+            
+            scheduleSample(sample) {
+                if (!this.audioCtx || !this.masterGain) {
+                    try { sample.close(); } catch (e) {}
+                    return;
+                }
+                
+                try {
+                    const samplePTS = sample.timestamp;
+                    const sampleDur = sample.duration;
+                    const channels = sample.numberOfChannels;
+                    const frames = sample.numberOfFrames;
+                    const sampleRate = sample.sampleRate;
+                    const vCurrent = video.currentTime || 0;
+                    const vRate = video.playbackRate || 1;
+                    
+                    if (samplePTS + sampleDur < vCurrent - 0.05) {
+                        sample.close();
+                        return;
+                    }
+                    
+                    const audioBuffer = this.audioCtx.createBuffer(channels, frames, sampleRate);
+                    const planeData = new Float32Array(frames);
+                    for (let c = 0; c < channels; c++) {
+                        sample.copyTo(planeData, { planeIndex: c, format: 'f32-planar' });
+                        audioBuffer.copyToChannel(planeData, c);
+                    }
+                    sample.close();
+                    
+                    const source = this.audioCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    source.playbackRate.value = vRate;
+                    source.connect(this.masterGain);
+                    
+                    const nowAudio = this.audioCtx.currentTime;
+                    let startAudioTime = 0;
+                    let offset = 0;
+                    
+                    const isContiguous = (this.lastSampleEndPTS >= 0) && Math.abs(samplePTS - this.lastSampleEndPTS) < 0.01;
+                    
+                    if (isContiguous && this.nextScheduledTime > nowAudio) {
+                        startAudioTime = this.nextScheduledTime;
+                    } else {
+                        const timeDelta = (samplePTS - vCurrent) / vRate;
+                        startAudioTime = Math.max(nowAudio, nowAudio + timeDelta);
+                        if (samplePTS < vCurrent && startAudioTime <= nowAudio) {
+                            offset = vCurrent - samplePTS;
+                        }
+                    }
+                    
+                    source.start(startAudioTime, offset);
+                    const scheduledDuration = Math.max(0, (sampleDur - offset) / vRate);
+                    this.nextScheduledTime = startAudioTime + scheduledDuration;
+                    this.lastSampleEndPTS = samplePTS + sampleDur;
+                    
+                    const nodeItem = {
+                        node: source,
+                        startAudioTime,
+                        endAudioTime: this.nextScheduledTime,
+                        samplePTS,
+                        sampleDur
+                    };
+                    this.activeNodes.add(nodeItem);
+                    
+                    source.onended = () => {
+                        this.activeNodes.delete(nodeItem);
+                        try { source.disconnect(); } catch (e) {}
+                    };
+                } catch (e) {
+                    console.warn('[AudioEngine] Schedule error:', e);
+                    try { sample.close(); } catch (err) {}
+                }
+            },
+            
+            stopAllScheduledNodes() {
+                for (const item of this.activeNodes) {
+                    try {
+                        item.node.stop();
+                        item.node.disconnect();
+                    } catch (e) {}
+                }
+                this.activeNodes.clear();
+                this.nextScheduledTime = 0;
+                this.lastSampleEndPTS = -1;
+            },
+            
+            onPlay() {
+                if (!this.active) return;
+                if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+                this.stopAllScheduledNodes();
+                this.startDecodeLoop(video.currentTime || 0);
+            },
+            
+            onPause() {
+                if (!this.active) return;
+                this.decodeGeneration++;
+                this.stopAllScheduledNodes();
+            },
+            
+            onSeeking() {
+                if (!this.active) return;
+                this.decodeGeneration++;
+                this.stopAllScheduledNodes();
+            },
+            
+            onSeeked() {
+                if (!this.active) return;
+                this.stopAllScheduledNodes();
+                if (!video.paused) {
+                    this.startDecodeLoop(video.currentTime || 0);
+                }
+            },
+            
+            onRateChange() {
+                if (!this.active || !this.audioCtx) return;
+                const rate = video.playbackRate || 1;
+                for (const item of this.activeNodes) {
+                    try { item.node.playbackRate.value = rate; } catch (e) {}
+                }
+                this.nextScheduledTime = this.audioCtx.currentTime + Math.max(0, (this.lastSampleEndPTS - (video.currentTime || 0)) / rate);
+            },
+            
+            onWaiting() {
+                if (!this.active || !this.audioCtx) return;
+                try { this.audioCtx.suspend(); } catch (e) {}
+            },
+            
+            onPlaying() {
+                if (!this.active || !this.audioCtx) return;
+                try { this.audioCtx.resume(); } catch (e) {}
+            },
+            
+            checkSync() {
+                if (!this.active || !this.audioCtx || video.paused || video.seeking) return;
+                const nowAudio = this.audioCtx.currentTime;
+                let activeNode = null;
+                for (const item of this.activeNodes) {
+                    if (item.startAudioTime <= nowAudio && nowAudio < item.endAudioTime) {
+                        activeNode = item;
+                        break;
+                    }
+                }
+                if (activeNode) {
+                    const audioMediaPTS = activeNode.samplePTS + (nowAudio - activeNode.startAudioTime) * (video.playbackRate || 1);
+                    const drift = Math.abs((video.currentTime || 0) - audioMediaPTS);
+                    if (drift > 0.18) {
+                        console.log('[AudioEngine] Drift detected:', drift.toFixed(3), 's. Resyncing...');
+                        this.stopAllScheduledNodes();
+                        this.startDecodeLoop(video.currentTime || 0);
+                    }
+                }
+            },
+            
+            reset() {
+                this.active = false;
+                this.selectedTrackIndex = 0;
+                this.decodeGeneration++;
+                this.stopAllScheduledNodes();
+                this.audioSink = null;
+                this.mediabunnyInput = null;
+                this.mediabunnyTracks = [];
+                this.currentSourceUrl = '';
+                const btn = $('audioTrackBtn');
+                if (btn) btn.classList.remove('dolby-active');
+                hideDolbyFallbackPrompt();
+            },
+            
+            deactivate() {
+                this.active = false;
+                this.decodeGeneration++;
+                this.stopAllScheduledNodes();
+                this.audioSink = null;
+                
+                const btn = $('audioTrackBtn');
+                if (btn) btn.classList.remove('dolby-active');
+                
+                // Restore native video audio
+                video.muted = (isAudioMuted || lastVol === 0);
+                video.volume = (lastVol || 100) / 100;
+                
+                renderAudioTrackUI(this.audioTracks, this.selectedTrackIndex);
+            },
+            
+            handleFailure(err) {
+                this.deactivate();
+                showDolbyFallbackPrompt();
+            }
+        };
+
+        // Synchronized Video Listeners for Audio Engine
+        video.addEventListener('play', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onPlay();
+            }
+        });
+        video.addEventListener('pause', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onPause();
+            }
+        });
+        video.addEventListener('seeking', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onSeeking();
+            }
+        });
+        video.addEventListener('seeked', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onSeeked();
+            }
+        });
+        video.addEventListener('ratechange', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onRateChange();
+            }
+        });
+        video.addEventListener('waiting', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onWaiting();
+            }
+        });
+        video.addEventListener('playing', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.onPlaying();
+            }
+        });
+        video.addEventListener('timeupdate', () => {
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.checkSync();
+            }
         });
 
         /* ================= NATIVE AUDIO SETUP ================= */
@@ -5681,8 +6637,10 @@
                                                     else if (entryType === 'vp09') codec = 'VP9';
                                                     else if (entryType === 'av01') codec = 'AV1';
                                                     else if (entryType === 'mp4a') { codec = 'AAC'; bitRate = '192 kbps'; }
-                                                    else if (entryType === 'ac-3') { codec = 'AC-3'; bitRate = '384 kbps'; }
-                                                    else if (entryType === 'ec-3') { codec = 'E-AC-3'; bitRate = '256 kbps'; }
+                                                    else if (entryType === 'ac-3' || entryType === 'sac3') { codec = 'AC-3'; bitRate = '384 kbps'; }
+                                                    else if (entryType === 'ec-3' || entryType === 'sec3') { codec = 'E-AC-3'; bitRate = '256 kbps'; }
+                                                    else if (entryType === 'dtsc' || entryType === 'dtsh' || entryType === 'dtsl' || entryType === 'dtse') { codec = 'DTS'; bitRate = '768 kbps'; }
+                                                    else if (entryType === 'mlpa') { codec = 'Dolby TrueHD'; bitRate = '1500 kbps'; }
                                                     else if (entryType === 'opus') { codec = 'Opus'; bitRate = '160 kbps'; }
                                                     else if (entryType === 'tx3g' || entryType === 'wvtt') codec = 'SRT';
                                                     else if (entryType) codec = entryType.toUpperCase();
@@ -5758,6 +6716,10 @@
             mediaFileInfo.subTracks = subTracks;
             mediaFileInfo.audioCount = audioTracks.length;
 
+            if (window.clientAudioEngine) {
+                clientAudioEngine.setTracks(audioTracks);
+            }
+
             const audioLangs = audioTracks.map(t => t.lang || t.name).filter(Boolean);
             const audioSummaryStr = audioTracks.length > 1 ? `${audioTracks.length} audios` : (audioTracks[0]?.codec ? `${audioTracks[0].codec} ${audioTracks[0].channels || 'Stereo'}` : 'AAC Stereo');
             if (val) val.textContent = audioSummaryStr;
@@ -5770,6 +6732,12 @@
             if (drBadge) {
                 drBadge.innerHTML = badgeHtml;
                 drBadge.classList.add('show');
+                drBadge.style.cursor = 'pointer';
+                drBadge.title = 'Click to switch audio track';
+                drBadge.onclick = e => {
+                    e.stopPropagation();
+                    toggleAudioTrackPop(true);
+                };
             }
 
             updateMediaInfoDisplay();
@@ -5835,6 +6803,9 @@
                 mediaFileInfo.audioTracks = tracks;
                 mediaFileInfo.audioCount = at.length;
                 updateMediaInfoDisplay();
+                if (window.clientAudioEngine) {
+                    clientAudioEngine.setTracks(tracks);
+                }
             } else {
                 if (note) note.innerHTML = `Audio stream active. If this MKV contains multi-audio tracks or DTS/TrueHD codecs, use <strong>Open in VLC</strong> below for hardware multi-track switching.`;
                 if (val) val.textContent = 'AAC Stereo';
@@ -5859,6 +6830,9 @@
                 }];
                 mediaFileInfo.audioCount = 1;
                 updateMediaInfoDisplay();
+                if (window.clientAudioEngine) {
+                    clientAudioEngine.setTracks(mediaFileInfo.audioTracks);
+                }
             }
         }
 
@@ -6104,7 +7078,7 @@
         let holding = false;
 
         function inControls(e) {
-            return e.target.closest('#controls, #volPop, #aspectPop, #aspectWrap, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
+            return e.target.closest('#controls, #volPop, #aspectPop, #aspectWrap, #audioTrackPop, #audioTrackWrap, #dolbyPrompt, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
         }
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
@@ -6269,6 +7243,8 @@
                         stage.classList.add('hide-ui');
                         volWrap.classList.remove('open');
                         if (aspectWrap) aspectWrap.classList.remove('open');
+                        const aWrap = $('audioTrackWrap');
+                        if (aWrap) aWrap.classList.remove('open');
                         pauseLiquidGlass();
                     }
                 }, duration);
@@ -6558,7 +7534,8 @@
                 return;
             }
             else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.code === 'AudioVolumeMute' || e.key === 'AudioVolumeMute') {
-                const next = (video.muted || video.volume === 0) ? (lastVol || 100) : 0;
+                const isCurrentlyMuted = isAudioMuted || (window.clientAudioEngine && clientAudioEngine.active ? isAudioMuted : (video.muted || video.volume === 0));
+                const next = isCurrentlyMuted ? (lastVol || 100) : 0;
                 setVolume(next);
                 triggerVolHud(next);
                 return; // Mute toggle ONLY shows volume capsule, does not wake UI
