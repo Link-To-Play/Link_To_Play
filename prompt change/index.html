@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Stream Player Pro</title>
+    <meta name="referrer" content="no-referrer">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Stream">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="player.css">
+</head>
+
+<body>
+    <div id="stage" tabindex="0">
+        <!-- Video element: crossorigin set dynamically in JS only when proxy or CORS is active -->
+        <video id="video" playsinline preload="auto"></video>
+
+        <!-- ============ LANDING SCREEN ============ -->
+        <div id="landingScreen">
+            <div class="landing-aurora">
+                <div class="aurora-orb orb-1"></div>
+                <div class="aurora-orb orb-2"></div>
+                <div class="aurora-orb orb-3"></div>
+            </div>
+            <div class="landing-card">
+                <div class="landing-brand">
+                    <span class="accent"></span>
+                    <h1>STREAM PLAYER <span class="landing-badge">PRO v2.0</span></h1>
+                </div>
+                <p class="landing-desc">
+                    High-performance hardware-accelerated video player with resilient gesture controls, direct streaming, container inspection, and instant VLC handoff.
+                </p>
+
+                <form id="landingForm" onsubmit="return false;">
+                    <div class="landing-input-group">
+                        <input type="url" id="landingUrl" class="landing-input"
+                            placeholder="Paste MKV or MP4 stream URL…" required spellcheck="false" autocomplete="off">
+                        <button type="submit" id="landingSubmit" class="landing-btn">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                            </svg>
+                            Play Stream
+                        </button>
+                    </div>
+                </form>
+
+                <div class="landing-divider">Or Open Directly via URL Parameter</div>
+
+                <div class="landing-guide">
+                    <div class="landing-guide-title">
+                        <span>Syntax Format</span>
+                        <button type="button" class="landing-copy-btn" id="copyFormatBtn">Copy</button>
+                    </div>
+                    <div class="landing-code-box" id="formatBox">
+                        <span class="code-text"><span id="domainBase">https://stream.harisgarage.workers.dev/</span><span class="param">?video=</span>&lt;STREAM_URL&gt;</span>
+                    </div>
+
+                    <div class="landing-guide-title" style="margin-top: 10px;">
+                        <span>Working Example</span>
+                        <button type="button" class="landing-copy-btn" id="copyExampleBtn">Copy</button>
+                    </div>
+                    <div class="landing-code-box" id="exampleBox">
+                        <span class="code-text" id="exampleUrl">https://vjs.zencdn.net/v/oceans.mp4</span>
+                    </div>
+                    <button type="button" id="btnTryDemo" class="landing-btn"
+                        style="width: 100%; margin-top: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14); font-size: 12px; padding: 10px;">
+                        ▶ Try Demo Video
+                    </button>
+                </div>
+
+                <div class="landing-features">
+                    <div class="landing-feat">
+                        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" /></svg></div>
+                        <span>Direct MKV & MP4 Playback</span>
+                    </div>
+                    <div class="landing-feat">
+                        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M7 2v11h3v9l7-12h-4l4-8z" /></svg></div>
+                        <span>Intuitive Gestures & 2× Boost</span>
+                    </div>
+                    <div class="landing-feat">
+                        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" /></svg></div>
+                        <span>VisionOS Glass Interface</span>
+                    </div>
+                    <div class="landing-feat">
+                        <div class="feat-icon"><svg viewBox="0 0 24 24"><path d="M12 3L2 20h20L12 3zm0 5.5L18.5 18h-13L12 8.5z" /></svg></div>
+                        <span>VLC One-Tap Handoff</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ LOADING SPINNER ============ -->
+        <div id="spinner" class="hidden" aria-label="Loading">
+            <div class="spinner-spokes" role="status">
+                <span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <!-- ============ CENTER ACTION ICON ============ -->
+        <div id="centerIcon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+                <path id="centerPath" d="M8 5v14l11-7z" />
+            </svg>
+        </div>
+
+        <!-- ============ TOP TITLE BAR ============ -->
+        <div id="titleBar">
+            <div class="title-header">
+                <div class="title-identity">
+                    <span class="accent"></span>
+                    <span class="name" id="movieName">Loading…</span>
+                </div>
+                <span class="title-res-badge" id="drResBadge"></span>
+                <span class="title-audio-badge" id="drAudioBadge"></span>
+                <span class="title-format-badge" id="drFormatBadge"></span>
+                <span class="title-size-badge" id="drSizeBadge"></span>
+            </div>
+            <button class="title-action-btn" id="titleReloadBtn" title="Reload player" aria-label="Reload player">
+                <svg viewBox="0 0 24 24">
+                    <path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- ============ UNIFIED HUD & TOAST (Never Overlapping) ============ -->
+        <div id="toastHud" aria-live="polite">
+            <svg class="hud-icon" id="hudIcon" viewBox="0 0 24 24"></svg>
+            <span class="hud-label" id="hudLabel"></span>
+            <div class="hud-bar" id="hudBar" style="display:none">
+                <div class="hud-bar-fill" id="hudBarFill"></div>
+            </div>
+        </div>
+
+        <!-- ============ JIOHOTSTAR DOUBLE-TAP SEEK FEEDBACK ============ -->
+        <div class="yt-seek-hud left" id="seekFxL" aria-hidden="true">
+            <div class="jio-seek-ripple"></div>
+            <div class="jio-seek-badge">
+                <svg class="jio-seek-svg" viewBox="0 0 24 24">
+                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+                    <path d="M10.9 16h-1.4v-4.6l-1.3.5V11l2.4-.9h.3v5.9zm4.2-.1c-.4 0-.8-.1-1.1-.3-.3-.2-.5-.5-.7-.9-.2-.4-.2-.8-.2-1.4v-.9c0-.6.1-1 .2-1.4.2-.4.4-.7.7-.9.3-.2.7-.3 1.1-.3s.8.1 1.1.3c.3.2.5.5.7.9.2.4.2.8.2 1.4v.9c0 .6-.1 1-.2 1.4-.2.4-.4.7-.7.9-.3.2-.7.3-1.1.3zm0-1c.2 0 .4-.1.5-.2.1-.2.2-.4.2-.7v-1.4c0-.3-.1-.5-.2-.7-.1-.2-.3-.2-.5-.2s-.4.1-.5.2c-.1.2-.2.4-.2.7v1.4c0 .3.1.5.2.7.1.1.3.2.5.2z"/>
+                </svg>
+                <div class="jio-seek-pill"><span class="jio-seek-sec" id="seekFxLblL">-10s</span></div>
+            </div>
+        </div>
+        <div class="yt-seek-hud right" id="seekFxR" aria-hidden="true">
+            <div class="jio-seek-ripple"></div>
+            <div class="jio-seek-badge">
+                <svg class="jio-seek-svg" viewBox="0 0 24 24">
+                    <path d="M18 13c0 3.31-2.69 6-6 6s-6-2.69-6-6 2.69-6 6-6v4l5-5-5-5v4c-4.42 0-8 3.58-8 8s3.58 8 8 8 8-3.58 8-8h-2z"/>
+                    <path d="M10.9 16h-1.4v-4.6l-1.3.5V11l2.4-.9h.3v5.9zm4.2-.1c-.4 0-.8-.1-1.1-.3-.3-.2-.5-.5-.7-.9-.2-.4-.2-.8-.2-1.4v-.9c0-.6.1-1 .2-1.4.2-.4.4-.7.7-.9.3-.2.7-.3 1.1-.3s.8.1 1.1.3c.3.2.5.5.7.9.2.4.2.8.2 1.4v.9c0 .6-.1 1-.2 1.4-.2.4-.4.7-.7.9-.3.2-.7.3-1.1.3zm0-1c.2 0 .4-.1.5-.2.1-.2.2-.4.2-.7v-1.4c0-.3-.1-.5-.2-.7-.1-.2-.3-.2-.5-.2s-.4.1-.5.2c-.1.2-.2.4-.2.7v1.4c0 .3.1.5.2.7.1.1.3.2.5.2z"/>
+                </svg>
+                <div class="jio-seek-pill"><span class="jio-seek-sec" id="seekFxLblR">+10s</span></div>
+            </div>
+        </div>
+
+        <!-- ============ BOTTOM CONTROL BAR ============ -->
+        <div id="controls" class="liquidgl-lens" role="toolbar" aria-label="Media Controls">
+            <!-- 1. Play / Pause -->
+            <button class="ctl-btn" id="playBtn" aria-label="Play/Pause" title="Play / Pause (Space / K)">
+                <svg id="icoPlay" viewBox="0 0 24 24">
+                    <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86a1 1 0 0 0-1.5.86z"/>
+                </svg>
+                <svg id="icoPause" viewBox="0 0 24 24" style="display:none">
+                    <rect x="6" y="4" width="4" height="16" rx="1.5"/>
+                    <rect x="14" y="4" width="4" height="16" rx="1.5"/>
+                </svg>
+            </button>
+
+            <!-- 2. Volume Wrap with VisionOS Glass Popup -->
+            <div id="volWrap">
+                <button class="ctl-btn" id="volBtn" aria-label="Volume" title="Mute / Unmute (M)">
+                    <svg id="icoVol" viewBox="0 0 24 24">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/>
+                    </svg>
+                </button>
+                <div id="volPop">
+                    <svg class="vp-icon" id="volPopIcon" viewBox="0 0 24 24">
+                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/>
+                    </svg>
+                    <div id="volTrack">
+                        <div class="vp-rail">
+                            <div class="vp-fill" id="volFill"></div>
+                            <div class="vp-thumb" id="volThumb"></div>
+                        </div>
+                    </div>
+                    <div class="vol-pct" id="volPct">100</div>
+                </div>
+            </div>
+
+            <!-- 3. Current Time -->
+            <span class="time-label" id="timeCurrent">0:00</span>
+
+            <!-- 4. Custom Div-based ARIA Seek Slider -->
+            <div class="seek-wrap" id="seekWrap">
+                <div class="seek-slider" id="seek" role="slider" tabindex="0" aria-label="Seek Slider"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div class="seek-buffer" id="seekBuffer"></div>
+                    <div class="seek-fill" id="seekFill"></div>
+                    <div class="seek-thumb" id="seekThumb"></div>
+                </div>
+                <div class="seek-tooltip" id="seekHoverTooltip">0:00</div>
+            </div>
+
+            <!-- 5. Remaining / Duration Time -->
+            <span class="time-label" id="timeRemaining" title="Click to toggle remaining / total">-0:00</span>
+
+            <!-- 6. Screen Fit / Aspect Ratio Picker -->
+            <div id="aspectWrap">
+                <button class="ctl-btn" id="aspectBtn" aria-label="Screen Fit" title="Screen Fit / Aspect Ratio (Z)">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/>
+                    </svg>
+                </button>
+                <div id="aspectPop">
+                    <div class="ap-header">
+                        <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z"/></svg>
+                        <span>Aspect Ratio</span>
+                    </div>
+                    <div class="ap-pills" id="aspectQuickPills">
+                        <button type="button" class="ap-pill active" data-fit="contain">Fit</button>
+                        <button type="button" class="ap-pill" data-fit="cover">Fill</button>
+                        <button type="button" class="ap-pill" data-fit="fill">Stretch</button>
+                        <button type="button" class="ap-pill" data-fit="16:9">16:9</button>
+                        <button type="button" class="ap-pill" data-fit="21:9">21:9</button>
+                        <button type="button" class="ap-pill" data-fit="4:3">4:3</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 7. Picture-in-Picture -->
+            <button class="ctl-btn" id="pipBtn" aria-label="Picture-in-Picture" title="Picture in Picture (P)">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z"/>
+                </svg>
+            </button>
+
+            <!-- 8. Settings Button -->
+            <button class="ctl-btn" id="setBtn" aria-label="Settings" title="Settings">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19.4 13a7.5 7.5 0 0 0 0-2l2.1-1.6a.5.5 0 0 0 .1-.6l-2-3.5a.5.5 0 0 0-.6-.2l-2.5 1a7.5 7.5 0 0 0-1.7-1L14.5 2.5a.5.5 0 0 0-.5-.5h-4a.5.5 0 0 0-.5.5L9.2 5a7.5 7.5 0 0 0-1.7 1l-2.5-1a.5.5 0 0 0-.6.2l-2 3.5a.5.5 0 0 0 .1.6L4.6 11a7.5 7.5 0 0 0 0 2l-2.1 1.6a.5.5 0 0 0-.1.6l2 3.5c.1.2.4.3.6.2l2.5-1a7.5 7.5 0 0 0 1.7 1l.3 2.6c0 .2.2.4.5.4h4c.3 0 .5-.2.5-.4l.3-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.5a.5.5 0 0 0-.1-.6L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
+                </svg>
+            </button>
+
+            <!-- 9. Fullscreen Button -->
+            <button class="ctl-btn" id="fsBtn" aria-label="Fullscreen" title="Fullscreen (F)">
+                <svg id="icoFsEnter" viewBox="0 0 24 24">
+                    <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                <svg id="icoFsExit" viewBox="0 0 24 24" style="display:none">
+                    <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- ============ ERROR BANNER WITH ACTIONS ============ -->
+        <div id="err" role="alert"></div>
+
+        <!-- ============ SETTINGS DRAWER ============ -->
+        <div id="drawerOverlay"></div>
+        <aside id="settingsDrawer" aria-label="Player Settings">
+            <div class="dr-head">
+                <h3>Settings</h3>
+                <button type="button" class="dr-close" id="drawerClose" aria-label="Close Settings">✕</button>
+            </div>
+
+            <!-- Playback Speed -->
+            <button type="button" class="dr-row" data-expand="secSpeed" aria-expanded="false">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                Playback speed
+                <span class="dr-val" id="speedVal">1×</span>
+                <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+            </button>
+            <div class="dr-sec" id="secSpeed">
+                <div class="speed-pills" id="speedPills">
+                    <button type="button" class="speed-pill" data-speed="0.5">0.5×</button>
+                    <button type="button" class="speed-pill" data-speed="0.75">0.75×</button>
+                    <button type="button" class="speed-pill active" data-speed="1">1×</button>
+                    <button type="button" class="speed-pill" data-speed="1.25">1.25×</button>
+                    <button type="button" class="speed-pill" data-speed="1.5">1.5×</button>
+                    <button type="button" class="speed-pill" data-speed="2">2×</button>
+                </div>
+            </div>
+
+            <!-- Screen Fit / Aspect Ratio -->
+            <button type="button" class="dr-row" data-expand="secAspect" aria-expanded="false">
+                <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V6h14v12zm-2-10h-4v2h4V8zm0 4h-4v2h4v-2zm-6-4H7v6h4V8z" /></svg>
+                Screen fit / Aspect
+                <span class="dr-val" id="aspectVal">Fit</span>
+                <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+            </button>
+            <div class="dr-sec" id="secAspect">
+                <div class="speed-pills" id="aspectPills">
+                    <button type="button" class="aspect-pill active" data-fit="contain">Fit</button>
+                    <button type="button" class="aspect-pill" data-fit="cover">Fill (Crop)</button>
+                    <button type="button" class="aspect-pill" data-fit="fill">Stretch</button>
+                    <button type="button" class="aspect-pill" data-fit="16:9">16:9</button>
+                    <button type="button" class="aspect-pill" data-fit="21:9">21:9</button>
+                    <button type="button" class="aspect-pill" data-fit="4:3">4:3</button>
+                </div>
+            </div>
+
+            <!-- Loop Video -->
+            <button type="button" class="dr-row" id="setLoop" role="switch" aria-checked="false">
+                <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z" /></svg>
+                Loop video
+                <span class="switch"></span>
+            </button>
+
+            <!-- Proxy Stream Mode -->
+            <button type="button" class="dr-row" id="setProxy" role="switch" aria-checked="false">
+                <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z" /></svg>
+                <span>Proxy Stream Mode</span>
+                <span class="switch"></span>
+            </button>
+
+            <!-- Tier 1 Liquid Glass UI Toggle -->
+            <button type="button" class="dr-row" id="setLiquidGlass" role="switch" aria-checked="false">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z" /></svg>
+                <span>✨ Liquid Glass (Static Refraction)</span>
+                <span class="switch"></span>
+            </button>
+
+            <!-- Media Info -->
+            <button type="button" class="dr-row" data-expand="secAudio" aria-expanded="false">
+                <svg viewBox="0 0 24 24"><path d="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" /></svg>
+                Media info
+                <span class="dr-val" id="audioVal">Auto</span>
+                <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+            </button>
+            <div class="dr-sec" id="secAudio">
+                <div class="media-info-grid" id="mediaInfoGrid"></div>
+                <div class="speed-pills" id="audioPills"></div>
+                <div class="dr-note" id="audioNote"></div>
+            </div>
+
+            <!-- Video Adjustments -->
+            <button type="button" class="dr-row expanded" data-expand="secAdj" aria-expanded="true">
+                <svg viewBox="0 0 24 24"><path d="M3 5h10v2H3zM17 5h4v2h-4zM15 3v6h2V3zM3 11h4v2H3zM11 11h10v2H11zM9 9v6h2V9zM3 17h12v2H3zM19 17h2v2h-2zM17 15v6h2v-6z" /></svg>
+                Video adjustments
+                <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+            </button>
+            <div class="dr-sec open" id="secAdj">
+                <label class="adj">
+                    <!-- Standard clean Sun Path for brightness -->
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 17.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11zm-1-16h2v3.5h-2V1.5zm0 17.5h2v3.5h-2V19zm9.5-8v2h-3.5v-2h3.5zM5 11v2H1.5v-2H5zm12.36-6.95l1.41 1.41-2.47 2.47-1.41-1.41 2.47-2.47zm-11.31 11.3l1.41 1.42-2.47 2.47-1.42-1.41 2.48-2.48zm13.78 2.48l-1.41 1.41-2.48-2.47 1.41-1.42 2.48 2.48zM6.05 4.64l1.41 1.41-2.47 2.48-1.41-1.42 2.47-2.47z" />
+                    </svg>
+                    <span>Brightness</span>
+                    <input type="range" id="fBri" min="30" max="200" value="100">
+                    <output id="oBri">100%</output>
+                </label>
+                <label class="adj">
+                    <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2v16a8 8 0 0 1 0-16z" /></svg>
+                    <span>Contrast</span>
+                    <input type="range" id="fCon" min="30" max="200" value="100">
+                    <output id="oCon">100%</output>
+                </label>
+                <label class="adj">
+                    <svg viewBox="0 0 24 24"><path d="M12 2s6.5 7.6 6.5 12a6.5 6.5 0 1 1-13 0C5.5 9.6 12 2 12 2z" /></svg>
+                    <span>Saturation</span>
+                    <input type="range" id="fSat" min="0" max="250" value="100">
+                    <output id="oSat">100%</output>
+                </label>
+                <label class="adj">
+                    <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 9 9h-2a7 7 0 1 1-7-7V3zm0 4a5 5 0 1 0 5 5h-2a3 3 0 1 1-3-3V7z" /></svg>
+                    <span>Hue</span>
+                    <input type="range" id="fHue" min="0" max="360" value="0">
+                    <output id="oHue">0°</output>
+                </label>
+                <div class="adj-btns">
+                    <button type="button" id="bAdjReset">⟲ Reset adjustments</button>
+                </div>
+            </div>
+
+            <!-- Other Options -->
+            <button type="button" class="dr-row" data-expand="secOther" aria-expanded="false">
+                <svg viewBox="0 0 24 24"><path d="M6 10a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm6 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm6 0a2 2 0 1 1 0 4 2 2 0 0 1 0-4z" /></svg>
+                Other
+                <svg class="dr-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5z" /></svg>
+            </button>
+            <div class="dr-sec" id="secOther">
+                <button type="button" class="dr-row" id="setReload">
+                    <svg viewBox="0 0 24 24"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>
+                    <span>Reload player</span>
+                </button>
+                <button type="button" class="dr-row" id="setNewStream">
+                    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" /></svg>
+                    <span>Open another stream</span>
+                </button>
+                <a class="dr-row dl-card" id="setDownload" download>
+                    <div class="dl-row-top">
+                        <svg class="dl-icon" viewBox="0 0 24 24" width="20" height="20">
+                            <path d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v2H5v-2z" />
+                        </svg>
+                        <span class="dl-title">Download file</span>
+                        <span class="dr-val" id="dlAudioBadge" style="margin-left:auto;">Audio included</span>
+                    </div>
+                    <div id="dlAudioSummary" class="dl-summary">Includes original stream audio track.</div>
+                </a>
+                <button type="button" class="dr-row" id="setVLC">
+                    <svg viewBox="0 0 24 24"><path d="M12 3L2 20h20L12 3zm0 5.5L18.5 18h-13L12 8.5z" /></svg>
+                    Open in VLC
+                </button>
+                <button type="button" class="dr-row" id="setDirect">
+                    <svg viewBox="0 0 24 24"><path d="M10.6 13.4a1 1 0 0 0 1.4 1.4l4-4a3.5 3.5 0 0 0-5-5L8.6 8.2a1 1 0 1 0 1.4 1.4l2.4-2.4a1.5 1.5 0 0 1 2.2 2.2l-4 4zm2.8-2.8a1 1 0 0 0-1.4-1.4l-4 4a3.5 3.5 0 0 0 5 5l2.4-2.4a1 1 0 0 0-1.4-1.4l-2.4 2.4a1.5 1.5 0 0 1-2.2-2.2l4-4z" /></svg>
+                    <span id="setDirectLbl">Copy direct link</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ============ VLC MODAL ============ -->
+        <div class="modal-overlay" id="vlcModal">
+            <div class="modal" role="dialog" aria-labelledby="vlcTitle">
+                <button type="button" class="modal-close" data-close="vlcModal" aria-label="Close dialog">✕</button>
+                <h3 id="vlcTitle">Open in VLC</h3>
+                <ol id="vlcSteps"></ol>
+                <div class="vlc-actions">
+                    <button type="button" class="dr-row primary" id="vlcLaunch">Launch VLC</button>
+                    <button type="button" class="dr-row" id="vlcCopy">Copy link</button>
+                    <a class="dr-row" id="vlcInstall" href="#" target="_blank" rel="noopener"></a>
+                </div>
+                <div id="vlcCopyStatus" style="font-size:11px; color:#2ecc71; margin-top:8px; text-align:center;"></div>
+            </div>
+        </div>
+
+        <!-- ============ DEBUG OVERLAY (?debug=1) ============ -->
+        <div id="debugOverlay" aria-live="off">
+            <div><span class="label">Mode: </span><span id="dbgMode">—</span></div>
+            <div><span class="label">Src: </span><span id="dbgSrc" style="word-break:break-all;">—</span></div>
+            <div><span class="label">Ready / Net: </span><span id="dbgReady">—</span> / <span id="dbgNet">—</span></div>
+            <div><span class="label">Buffered: </span><span id="dbgBuf">—</span></div>
+            <div><span class="label">Last Error: </span><span id="dbgErr">None</span></div>
+            <div><span class="label">Glass FPS: </span><span id="dbgFps">—</span></div>
+        </div>
+    </div>
+
+    <!-- LiquidGL WebGL / WebGPU Shader Engine -->
+    <script src="liquidGL.js"></script>
+    <!-- Hardened Player Core Logic -->
+    <script src="player.js"></script>
+</body>
+
+</html>

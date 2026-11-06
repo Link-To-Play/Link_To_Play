@@ -46,11 +46,12 @@
 * **High-Speed Direct Playback:** Streams full-bitrate MKV, MP4, WebM, and MOV containers directly from the upstream media host.
 * **Worker Proxy Fallback (`worker.js`):** Seamless Cloudflare Edge Worker proxy mode to bypass strict corporate firewalls, missing CORS headers, or network restrictions.
 
-### 🔊 3. Multi-Track Audio & Subtitle Inspector
-* **EBML / Header Range Inspector:** Reads the first 2 MB container header on demand without downloading the entire video file.
-* **Audio Track Detection:** Inspects embedded audio streams including **Dolby Digital (AC-3)**, **Dolby Digital Plus (E-AC-3)**, **AAC (2.0 / 5.1 / 7.1)**, sample rates, and bitrates.
-* **Embedded Subtitles:** Displays embedded SRT and VTT subtitle track availability directly in the Media Info drawer.
-* **Audio Badges:** Real-time top/bottom badges displaying active audio track count and channel format (e.g. `5.1 Audios`).
+### 🔊 3. Client-Side AC-3 / E-AC-3 / DTS Audio Decoding & Multi-Track Selector (0 Server Load)
+* **Zero Server Transcoding Load:** Decodes Dolby Digital (**AC-3**), Dolby Digital Plus (**E-AC-3**), and **DTS** directly in Chrome, Edge, Chromium, and Mobile Safari using client-side WebAssembly demuxing and decoding via the Web Audio API.
+* **Conditional Activation (Zero Overhead for Standard AAC):** If the default audio track is standard AAC or MP3, the WASM engine remains completely inert and lets native browser hardware decoding play the audio directly. The decoder activates only when Dolby/DTS audio is detected or when switching to a non-default audio track.
+* **Microsecond Audio-Video Lip Sync:** Synchronizes decoded PCM audio buffers with the `<video>` element across `play`, `pause`, `seeking`, `ratechange`, and dynamic drift correction.
+* **In-Controls Audio Selector:** Dedicated visionOS liquid glass audio picker button and settings drawer pills to switch instantly between all embedded audio tracks (e.g. `Tamil [AC-3 5.1]`, `English [AAC Stereo]`) without interrupting video playback.
+* **Graceful Fallback & External Handoff:** Automatic non-intrusive notification prompt with 1-click VLC and external player handoff if WebAssembly or AudioContext is unsupported.
 
 ### 📱 4. Mobile Double-Tap & Gesture Engine
 * **Double-Tap Left / Right (±10s Seek):** JioHotstar-style visionOS animated glass ripple showing cumulative seconds (`-10s`, `-20s`, `+10s`, etc.).
