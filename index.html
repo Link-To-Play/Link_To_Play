@@ -7654,21 +7654,24 @@
                     console.log('[Backend] Successfully loaded track specifications:', tracks);
                     backendIntegrationActive = true;
                     window.backendIntegrationActive = true;
+                    if (window.clientAudioEngine) clientAudioEngine.deactivate();
 
                     const audioTracks = tracks.filter(t => {
                         const ctype = (t.codec_type || t.type || '').toLowerCase();
                         const codec = (t.codec_name || '').toLowerCase();
+                        if (ctype === 'video' || ['h264', 'hevc', 'av1', 'vp9', 'vp8', 'mpeg4', 'mjpeg'].includes(codec)) return false;
                         const isSub = ctype === 'subtitle' || ctype === 'subtitles' || [
                             'srt', 'ass', 'ssa', 'vtt', 'webvtt', 'subrip', 'mov_text', 'tx3g', 'sup', 'pgs', 'sub', 'vobsub', 'dvb_subtitle', 'sami', 'microdvd', 'teletext', 'cc', 'ttml', 'arib_caption', 'xsub'
                         ].includes(codec);
-                        if (ctype === 'audio') return true;
                         if (isSub) return false;
-                        return true;
+                        if (ctype === 'audio') return true;
+                        return ['aac', 'ac3', 'eac3', 'dts', 'truehd', 'mp3', 'opus', 'vorbis', 'flac'].includes(codec);
                     });
 
                     const subTracks = tracks.filter(t => {
                         const ctype = (t.codec_type || t.type || '').toLowerCase();
                         const codec = (t.codec_name || '').toLowerCase();
+                        if (ctype === 'video' || ['h264', 'hevc', 'av1', 'vp9', 'vp8', 'mpeg4', 'mjpeg'].includes(codec)) return false;
                         return ctype === 'subtitle' || ctype === 'subtitles' || [
                             'srt', 'ass', 'ssa', 'vtt', 'webvtt', 'subrip', 'mov_text', 'tx3g', 'sup', 'pgs', 'sub', 'vobsub', 'dvb_subtitle', 'sami', 'microdvd', 'teletext', 'cc', 'ttml', 'arib_caption', 'xsub'
                         ].includes(codec);
@@ -7680,7 +7683,8 @@
                         const label = trackLabel(t, idx);
                         const isSupported = (codec === 'aac' || codec === 'mp3' || codec === 'opus' || codec === 'vorbis' || codec === 'flac') && channels <= 2;
                         return {
-                            index: t.index, // FFmpeg stream index!
+                            index: idx, // 0-based audio index for backend /audio/:audioIndex/:id
+                            streamIndex: t.index,
                             audioIndex: idx,
                             codec: formatCodecName(t.codec_name),
                             rawCodec: t.codec_name,
@@ -7697,7 +7701,8 @@
                         const isBitmap = isBitmapSubtitle(s);
                         const label = formatSubtitleLabel(s, idx);
                         return {
-                            index: s.index, // FFmpeg stream index!
+                            index: idx, // 0-based subtitle index for backend /subs/:subIndex/:id
+                            streamIndex: s.index,
                             subIndex: idx,
                             codec: formatCodecName(s.codec_name),
                             rawCodec: s.codec_name,
@@ -7728,7 +7733,7 @@
                     // Auto-switch to first track if unsupported
                     const hasAudsFilter = new URL(target, window.location.href).searchParams.has('auds');
                     if (shouldTranscodeDefault || hasAudsFilter) {
-                        console.log(`[AudioTrack] Auto-switching to first selected track: ${firstTrack.index}`);
+                        console.log(`[AudioTrack] Auto-switching to first audio track (codec: ${firstTrack.codec_name})`);
                         selectBackendAudioTrack(0);
                     } else {
                         console.log(`[AudioTrack] Native audio codec detected (${firstTrack?.codec_name || 'AAC'}), zero overhead.`);
@@ -8310,6 +8315,7 @@
         }
 
         function renderMediaTracks(tracks) {
+            if (window.backendIntegrationActive) return;
             const pills = $('audioPills'), note = $('audioNote'), val = $('audioVal');
             if (pills) pills.innerHTML = '';
 
@@ -8385,6 +8391,7 @@
         }
 
         function setupFallbackTracks() {
+            if (window.backendIntegrationActive) return;
             const pills = $('audioPills'), note = $('audioNote'), val = $('audioVal');
             const dlBadge = $('dlAudioBadge'), dlSummary = $('dlAudioSummary');
             if (pills) pills.innerHTML = '';
@@ -8459,7 +8466,7 @@
         }
 
         async function inspectMediaMetadata(url) {
-            if (!url) return;
+            if (!url || window.backendIntegrationActive) return;
             const targets = [];
             // In direct mode (default), prioritize direct URL first to avoid spurious proxy 404s
             if (useProxy) {
