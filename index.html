@@ -4550,6 +4550,8 @@
         const seekFxL = $('seekFxL'), seekFxR = $('seekFxR');
         const secondaryAudio = $('secondaryAudio');
         const subTrackWrap = $('subTrackWrap'), subTrackBtn = $('subTrackBtn'), subTrackList = $('subTrackList');
+        let audioLoading = false;
+        let videoWasPlaying = false;
 
         /* ================= APPLE SPOKE LOADER ================= */
         const APPLE_SPOKES_HTML = `<div class="spinner-spokes" role="status" aria-label="Loading">
@@ -5448,11 +5450,28 @@
             }
         }
         function setPlayIcon() {
-            const playing = !video.paused && !video.ended;
+            const isBuffering = audioLoading && videoWasPlaying;
+            const playing = (!video.paused && !video.ended) || isBuffering;
             icoPlay.style.display = playing ? 'none' : 'block';
             icoPause.style.display = playing ? 'block' : 'none';
         }
         function togglePlay() {
+            if (audioLoading) {
+                if (videoWasPlaying) {
+                    // User explicitly wants to pause while buffering
+                    videoWasPlaying = false;
+                    hideSpinner(true);
+                    setPlayIcon();
+                    showCenter(D_PAUSE, false, () => { showCenter(D_PLAY, true); });
+                } else {
+                    // User wants to play
+                    videoWasPlaying = true;
+                    showSpinner();
+                    centerIcon.classList.remove('on', 'sticky');
+                    setPlayIcon();
+                }
+                return;
+            }
             if (video.paused || video.ended) {
                 if (video.readyState < 3) showSpinner();
                 video.play().catch(() => {
@@ -5480,11 +5499,25 @@
         });
 
         video.addEventListener('play', () => {
+            if (audioLoading) {
+                videoWasPlaying = true;
+                video.pause();
+                showSpinner();
+                centerIcon.classList.remove('on', 'sticky');
+                setPlayIcon();
+                return;
+            }
             setPlayIcon();
             requestWakeLock();
             showCenter(D_PLAY, false);              /* flash play → fade out */
         });
         video.addEventListener('pause', () => {
+            if (audioLoading) {
+                showSpinner();
+                centerIcon.classList.remove('on', 'sticky');
+                setPlayIcon();
+                return;
+            }
             if (!video.seeking && video.readyState >= 3) hideSpinner(true);
             setPlayIcon();
             releaseWakeLock();
@@ -6907,79 +6940,105 @@
         });
 
         /* ================= BACKEND MULTI-TRACK AUDIO & WEBVTT SUBTITLE ENGINE ================= */
-        const LANG_MAP = {
-            eng:'English', en:'English', hin:'Hindi', hi:'Hindi',
-            tam:'Tamil', ta:'Tamil', tel:'Telugu', te:'Telugu',
-            mal:'Malayalam', ml:'Malayalam', kan:'Kannada', kn:'Kannada',
-            ben:'Bengali', bn:'Bengali', pan:'Punjabi', pa:'Punjabi',
-            guj:'Gujarati', gu:'Gujarati', mar:'Marathi', mr:'Marathi',
-            urd:'Urdu', ur:'Urdu',
-            fre:'French', fra:'French', fr:'French', spa:'Spanish', es:'Spanish',
-            ger:'German', deu:'German', de:'German', rus:'Russian', ru:'Russian',
-            chi:'Chinese', zho:'Chinese', zh:'Chinese', jpn:'Japanese', ja:'Japanese',
-            kor:'Korean', ko:'Korean', ara:'Arabic', ar:'Arabic',
-            por:'Portuguese', pt:'Portuguese', ita:'Italian', it:'Italian',
-            tur:'Turkish', tr:'Turkish', dut:'Dutch', nld:'Dutch', nl:'Dutch'
+        const EXTENDED_LANG_MAP = {
+            eng:'English', en:'English', english:'English',
+            hin:'Hindi', hi:'Hindi', hindi:'Hindi',
+            tam:'Tamil', ta:'Tamil', tamil:'Tamil',
+            tel:'Telugu', te:'Telugu', telugu:'Telugu',
+            mal:'Malayalam', ml:'Malayalam', malayalam:'Malayalam', maltam:'Malayalam',
+            kan:'Kannada', kn:'Kannada', kannada:'Kannada',
+            ben:'Bengali', bn:'Bengali', bengali:'Bengali',
+            pan:'Punjabi', pa:'Punjabi', punjabi:'Punjabi',
+            guj:'Gujarati', gu:'Gujarati', gujarati:'Gujarati',
+            mar:'Marathi', mr:'Marathi', marathi:'Marathi',
+            urd:'Urdu', ur:'Urdu', urdu:'Urdu',
+            ger:'German', deu:'German', de:'German', german:'German', grem:'German',
+            fre:'French', fra:'French', fr:'French', french:'French',
+            spa:'Spanish', es:'Spanish', spanish:'Spanish',
+            ita:'Italian', it:'Italian', italian:'Italian',
+            por:'Portuguese', pt:'Portuguese', portuguese:'Portuguese',
+            rus:'Russian', ru:'Russian', russian:'Russian',
+            chi:'Chinese', zho:'Chinese', zh:'Chinese', chinese:'Chinese',
+            jpn:'Japanese', ja:'Japanese', japanese:'Japanese',
+            kor:'Korean', ko:'Korean', korean:'Korean',
+            ara:'Arabic', ar:'Arabic', arabic:'Arabic',
+            tur:'Turkish', tr:'Turkish', turkish:'Turkish',
+            dut:'Dutch', nld:'Dutch', nl:'Dutch', dutch:'Dutch',
+            swe:'Swedish', sv:'Swedish', swedish:'Swedish',
+            nor:'Norwegian', no:'Norwegian', norwegian:'Norwegian',
+            dan:'Danish', da:'Danish', danish:'Danish',
+            fin:'Finnish', fi:'Finnish', finnish:'Finnish',
+            pol:'Polish', pl:'Polish', polish:'Polish',
+            vie:'Vietnamese', vi:'Vietnamese', vietnamese:'Vietnamese',
+            tha:'Thai', th:'Thai', thai:'Thai',
+            ind:'Indonesian', id:'Indonesian', indonesian:'Indonesian',
+            fil:'Filipino', tl:'Filipino', filipino:'Filipino',
+            heb:'Hebrew', he:'Hebrew', hebrew:'Hebrew',
+            gre:'Greek', ell:'Greek', el:'Greek', greek:'Greek',
+            cze:'Czech', ces:'Czech', cs:'Czech', czech:'Czech',
+            hun:'Hungarian', hu:'Hungarian', hungarian:'Hungarian',
+            ukr:'Ukrainian', uk:'Ukrainian', ukrainian:'Ukrainian',
+            rou:'Romanian', ron:'Romanian', ro:'Romanian', romanian:'Romanian'
         };
+        const LANG_MAP = EXTENDED_LANG_MAP;
 
-        const LANG_KEYS_MAP = {};
-        for (const [key, name] of Object.entries(LANG_MAP)) {
-            if (!LANG_KEYS_MAP[name]) {
-                LANG_KEYS_MAP[name] = new Set();
-            }
-            LANG_KEYS_MAP[name].add(key.toLowerCase());
-            LANG_KEYS_MAP[name].add(name.toLowerCase());
-            if (name.length > 3) {
-                LANG_KEYS_MAP[name].add(name.substring(0, 3).toLowerCase());
-            }
+        function cleanMediaMetadata(str) {
+            if (!str) return '';
+            return str
+                .replace(/@[\w\.\-]+/g, '') // remove @usernames / telegram channels
+                .replace(/\[[^\]]*\]/g, '') // remove [brackets]
+                .replace(/\([^)]*\)/g, '') // remove (parentheses)
+                .replace(/[_\.]/g, ' ')
+                .replace(/\b(1080p|720p|4k|2160p|bluray|web-dl|webdl|x264|x265|hevc|aac|ac3|eac3|dts|truehd|dd\+?|atmos|hdr|sdr|remux)\b/gi, '')
+                .replace(/\b(sound|audio|track|stereo|multi|ch|channel|dub|dubbed|embedded|default|unknown)\b/gi, '')
+                .replace(/[^a-zA-Z\s]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
         }
 
-        function getMatchedLanguages(track) {
+        function trackLabel(track, idx, allTracks) {
             const meta = track.tags || {};
-            const lang = (meta.language || meta.LANGUAGE || meta.Language || '').toLowerCase().trim();
-            const title = (meta.title || meta.TITLE || meta.Title || '').toLowerCase().trim();
-            const handler = (meta.handler_name || '').replace(/\x00/g, '').toLowerCase().trim();
+            const rawLang = (meta.language || meta.LANGUAGE || meta.Language || '').toLowerCase().trim();
 
-            const matched = [];
-            for (const [name, keysSet] of Object.entries(LANG_KEYS_MAP)) {
-                let isMatch = false;
-                if (lang && keysSet.has(lang)) {
-                    isMatch = true;
-                }
-                if (!isMatch) {
-                    for (const key of keysSet) {
-                        const regex = new RegExp('\\b' + key + '\\b', 'i');
-                        if (regex.test(title) || regex.test(handler)) {
-                            isMatch = true;
-                            break;
-                        }
-                    }
-                }
-                if (isMatch) {
-                    matched.push(name);
+            // 1. Direct language code match
+            if (rawLang && rawLang !== 'und' && EXTENDED_LANG_MAP[rawLang]) {
+                return EXTENDED_LANG_MAP[rawLang];
+            }
+
+            // 2. Search in title and handler
+            const rawTitle = (meta.title || meta.TITLE || meta.Title || '').trim();
+            const rawHandler = (meta.handler_name || '').replace(/\x00/g, '').trim();
+            const textToSearch = (rawTitle + ' ' + rawHandler + ' ' + rawLang).toLowerCase();
+
+            const matchedLangs = [];
+            for (const [code, fullName] of Object.entries(EXTENDED_LANG_MAP)) {
+                const regex = new RegExp('\\b' + code + '\\b', 'i');
+                if (regex.test(textToSearch) && !matchedLangs.includes(fullName)) {
+                    matchedLangs.push(fullName);
                 }
             }
-            return matched;
-        }
 
-        function trackLabel(track, idx) {
-            const matchedLangs = getMatchedLanguages(track);
-            let label = '';
-            if (matchedLangs.length > 0) {
-                label = matchedLangs.join(' + ');
-                if (idx === 0) label += ' (Default)';
-            } else {
-                label = idx === 0 ? 'Default (Embedded)' : `Track ${idx + 1}`;
-                const meta = track.tags || {};
-                const title = (meta.title || meta.TITLE || meta.Title || '').trim();
-                const handler = (meta.handler_name || '').replace(/\x00/g, '').trim();
-                if (title) {
-                    label += ` — ${title}`;
-                } else if (handler && !['sound','audio','track'].some(w => handler.toLowerCase().includes(w))) {
-                    label += ` — ${handler}`;
+            if (matchedLangs.length === 1) {
+                return matchedLangs[0];
+            } else if (matchedLangs.length > 1) {
+                // If title mentions multiple languages like 'Hindi + Tamil' or 'Hindi + Telugu'
+                // Disambiguate by track position among audio streams:
+                if (allTracks && allTracks.length > 1) {
+                    const prevNames = allTracks.slice(0, idx).map(t => trackLabel(t, -1, null));
+                    const unclaimed = matchedLangs.find(l => !prevNames.includes(l));
+                    if (unclaimed) return unclaimed;
+                    if (matchedLangs[idx]) return matchedLangs[idx];
                 }
+                return matchedLangs[idx] || matchedLangs[0];
             }
-            return label;
+
+            // 3. Fallback: cleaned title text without release metadata
+            const cleaned = cleanMediaMetadata(rawTitle || rawHandler);
+            if (cleaned && cleaned.length > 1 && !/^\d+$/.test(cleaned)) {
+                return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+            }
+
+            return idx >= 0 ? `Audio ${idx + 1}` : 'Audio';
         }
 
         function formatCodecName(codec) {
@@ -7058,8 +7117,6 @@
         let activeTrackIdx = null; // null = default
         let startVideoTime = 0;
         let seekDebounce = null;
-        let audioLoading = false;
-        let videoWasPlaying = false;
         let shouldTranscodeDefault = false;
 
         let backendAudioTracks = [];
@@ -7166,12 +7223,14 @@
             if (activeTrackIdx === null || !activeAudio) return;
             audioLoading = true;
             showSpinner();
+            centerIcon.classList.remove('on', 'sticky');
 
-            // Pause video if currently playing so it doesn't drift while fetching/transcoding
+            // Pause video silently if currently playing so it doesn't drift while fetching/transcoding
             if (!video.paused) {
                 videoWasPlaying = true;
                 video.pause();
             }
+            setPlayIcon();
 
             activeAudio.oncanplay = null;
             activeAudio.onerror = null;
@@ -7189,6 +7248,7 @@
                 console.error('[AudioTrack] stream error:', activeAudio.error);
                 audioLoading = false;
                 hideSpinner(true);
+                setPlayIcon();
             };
 
             activeAudio.oncanplay = () => {
@@ -7197,16 +7257,17 @@
                 hideSpinner(true);
                 startVideoTime = video.currentTime;
 
-                if (videoWasPlaying || !video.paused) {
+                if (videoWasPlaying) {
                     videoWasPlaying = false;
-                    activeAudio.play().then(() => {
-                        video.play().catch(() => { });
-                    }).catch(e => {
-                        console.warn('[AudioTrack] play failed:', e.message);
-                        video.pause();
+                    const p1 = activeAudio.play().catch(e => console.warn('[Audio] play error:', e.message));
+                    const p2 = video.play().catch(e => console.warn('[Video] play error:', e.message));
+                    Promise.allSettled([p1, p2]).then(() => {
+                        setPlayIcon();
                     });
                 } else {
                     activeAudio.pause();
+                    setPlayIcon();
+                    if (video.paused) showCenter(D_PLAY, true);
                 }
             };
         }
@@ -7251,12 +7312,12 @@
                 switchToDefault();
                 const btn = $('audioTrackBtn');
                 if (btn) btn.classList.remove('dolby-active');
-                showAudioToast(`${track.lang} [Native ${track.codec}]`);
+                showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
             } else {
                 switchToTrack(track.index);
                 const btn = $('audioTrackBtn');
                 if (btn) btn.classList.add('dolby-active');
-                showAudioToast(`${track.lang} [Transcoded AAC]`);
+                showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
             }
         }
 
@@ -7269,6 +7330,8 @@
         let subtitleSyncOffset = 0.0;
         let subtitleWindowStart = {};
         let activeSubtitleAbortController = null;
+        let subSeekDebounce = null;
+        let subtitleStreamingActive = {};
 
         function isBitmapSubtitle(sub) {
             if (!sub) return false;
@@ -7276,50 +7339,92 @@
             return ['sup', 'pgs', 'hdmv_pgs_subtitle', 'sub', 'vobsub', 'dvd_subtitle', 'dvb_subtitle', 'dvbsub', 'xsub'].includes(codec);
         }
 
-        function formatSubtitleLabel(sub, sIdx) {
-            const matchedLangs = getMatchedLanguages(sub);
-            let langStr = matchedLangs.length > 0 ? matchedLangs.join(' + ') : `Subtitle ${sIdx + 1}`;
+        function formatSubtitleLabel(sub, sIdx, allSubs) {
             const meta = sub.tags || {};
-            const title = (meta.title || meta.TITLE || meta.Title || '').trim();
-            let rawCodec = (sub.codec_name || '').toUpperCase();
-            let codecBadge = rawCodec;
-            if (rawCodec === 'SUBRIP' || rawCodec === 'TEXT' || rawCodec === 'TX3G') codecBadge = 'SRT';
-            else if (rawCodec === 'HDMV_PGS_SUBTITLE' || rawCodec === 'SUP') codecBadge = 'PGS';
-            else if (rawCodec === 'DVD_SUBTITLE' || rawCodec === 'VOBSUB') codecBadge = 'VobSub';
-            else if (rawCodec === 'WEBVTT') codecBadge = 'VTT';
-            else if (rawCodec === 'DVB_SUBTITLE') codecBadge = 'DVB';
+            const rawLang = (meta.language || meta.LANGUAGE || meta.Language || '').toLowerCase().trim();
 
-            let label = langStr;
-            if (title && !label.toLowerCase().includes(title.toLowerCase())) {
-                label += ` — ${title}`;
+            let langName = '';
+            if (rawLang && rawLang !== 'und' && EXTENDED_LANG_MAP[rawLang]) {
+                langName = EXTENDED_LANG_MAP[rawLang];
             }
-            if (codecBadge) {
-                label += ` (${codecBadge})`;
+
+            const rawTitle = (meta.title || meta.TITLE || meta.Title || '').trim();
+            const rawHandler = (meta.handler_name || '').replace(/\x00/g, '').trim();
+
+            if (!langName) {
+                const textToSearch = (rawTitle + ' ' + rawHandler + ' ' + rawLang).toLowerCase();
+                const matchedLangs = [];
+                for (const [code, fullName] of Object.entries(EXTENDED_LANG_MAP)) {
+                    const regex = new RegExp('\\b' + code + '\\b', 'i');
+                    if (regex.test(textToSearch) && !matchedLangs.includes(fullName)) {
+                        matchedLangs.push(fullName);
+                    }
+                }
+                if (matchedLangs.length === 1) {
+                    langName = matchedLangs[0];
+                } else if (matchedLangs.length > 1) {
+                    if (allSubs && allSubs.length > 1) {
+                        const prevNames = allSubs.slice(0, sIdx).map(s => formatSubtitleLabel(s, -1, null));
+                        const unclaimed = matchedLangs.find(l => !prevNames.includes(l));
+                        if (unclaimed) langName = unclaimed;
+                    }
+                    if (!langName) langName = matchedLangs[sIdx] || matchedLangs[0];
+                }
             }
-            return label;
+
+            if (!langName) {
+                const cleaned = cleanMediaMetadata(rawTitle || rawHandler);
+                if (cleaned && cleaned.length > 1 && !/^\d+$/.test(cleaned)) {
+                    langName = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+                } else {
+                    langName = sIdx >= 0 ? `Subtitle ${sIdx + 1}` : 'Subtitles';
+                }
+            }
+
+            // Flag special subtitles cleanly (SDH/CC or Forced)
+            const fullTitle = (rawTitle + ' ' + rawHandler).toLowerCase();
+            if (/\b(sdh|cc|hearing impaired|closed captions?)\b/i.test(fullTitle)) {
+                langName += ' [CC]';
+            } else if (/\b(forced)\b/i.test(fullTitle)) {
+                langName += ' (Forced)';
+            }
+
+            return langName;
         }
 
         function currentSubtitleSeekStart() {
             if (!video || !isFinite(video.currentTime)) return 0;
-            return Math.max(0, video.currentTime - 10);
+            return Math.max(0, Math.floor(video.currentTime) - 5);
         }
 
         function refreshSubtitleForSeek() {
             const idx = activeSubtitleStreamIdx;
             if (idx === null || activeBitmapSubIdx !== null) return;
-            if (subtitleWindowStart[idx] === undefined) return;
             const t = isFinite(video.currentTime) ? video.currentTime : 0;
             const cues = parsedSubtitleCues[idx] || [];
-            if (cues.length) {
+            if (cues.length > 0) {
+                const hasNearbyCue = cues.some(c => (t >= c.s - 2 && t <= c.e + 2) || (c.s >= t && c.s <= t + 15));
+                if (hasNearbyCue) {
+                    paintCue();
+                    return;
+                }
                 const minS = cues[0].s;
-                const maxE = cues[cues.length - 1].s;
-                if (t >= minS - 2 && t <= maxE + 2) return;
-            } else if (t >= subtitleWindowStart[idx]) {
+                const maxE = cues[cues.length - 1].e;
+                if (t >= minS && t <= maxE) {
+                    paintCue();
+                    return;
+                }
+            }
+            if (subtitleWindowStart[idx] !== undefined && t >= subtitleWindowStart[idx] && subtitleStreamingActive[idx]) {
+                paintCue();
                 return;
             }
-            const ssStart = currentSubtitleSeekStart();
-            subtitleWindowStart[idx] = ssStart;
-            fetchSubtitleStream(idx, buildSubtitleUrl(idx, ssStart));
+            clearTimeout(subSeekDebounce);
+            subSeekDebounce = setTimeout(() => {
+                const ssStart = currentSubtitleSeekStart();
+                subtitleWindowStart[idx] = ssStart;
+                fetchSubtitleStream(idx, buildSubtitleUrl(idx, ssStart));
+            }, 350);
         }
 
         function unescapeHTML(str) {
@@ -7449,10 +7554,16 @@
         }
 
         async function fetchSubtitleStream(subIndex, url) {
+            if (!parsedSubtitleCues[subIndex]) {
+                parsedSubtitleCues[subIndex] = [];
+            }
+            const cues = parsedSubtitleCues[subIndex];
+
             if (activeSubtitleAbortController) {
                 try { activeSubtitleAbortController.abort(); } catch (e) { }
             }
             activeSubtitleAbortController = new AbortController();
+            subtitleStreamingActive[subIndex] = true;
 
             try {
                 const res = await fetch(url, { signal: activeSubtitleAbortController.signal });
@@ -7463,8 +7574,16 @@
                     const decoder = new TextDecoder('utf-8');
                     let vttBuffer = '';
                     let consumed = 0;
-                    const cues = [];
-                    parsedSubtitleCues[subIndex] = cues;
+
+                    const mergeNewCues = (newParsed) => {
+                        for (let i = 0; i < newParsed.length; i++) {
+                            const nc = newParsed[i];
+                            if (!cues.some(c => Math.abs(c.s - nc.s) < 0.2 && c.t === nc.t)) {
+                                cues.push(nc);
+                            }
+                        }
+                        cues.sort((a, b) => a.s - b.s);
+                    };
 
                     const drainCompleteBlocks = () => {
                         const lastBreak = vttBuffer.lastIndexOf('\n\n');
@@ -7473,7 +7592,7 @@
                         if (end <= consumed) return;
                         const parsed = parseWebVTT(vttBuffer.slice(consumed, end));
                         consumed = end;
-                        for (let i = 0; i < parsed.length; i++) cues.push(parsed[i]);
+                        mergeNewCues(parsed);
                     };
 
                     while (true) {
@@ -7490,13 +7609,22 @@
                     paintCue();
                 } else {
                     const vttText = await res.text();
-                    parsedSubtitleCues[subIndex] = parseWebVTT(vttText);
+                    const parsed = parseWebVTT(vttText);
+                    for (let i = 0; i < parsed.length; i++) {
+                        const nc = parsed[i];
+                        if (!cues.some(c => Math.abs(c.s - nc.s) < 0.2 && c.t === nc.t)) {
+                            cues.push(nc);
+                        }
+                    }
+                    cues.sort((a, b) => a.s - b.s);
                     paintCue();
                 }
             } catch (err) {
                 if (err.name !== 'AbortError') {
                     console.error('[Subtitles] Failed to stream subtitles:', err);
                 }
+            } finally {
+                subtitleStreamingActive[subIndex] = false;
             }
         }
 
@@ -7526,13 +7654,16 @@
 
             activeBitmapSubIdx = null;
             getSubtitleOverlay();
+            if (subTimer) clearInterval(subTimer);
             subTimer = setInterval(paintCue, 100);
 
-            const ssStart = currentSubtitleSeekStart();
             const existing = parsedSubtitleCues[subIndex];
-            if (existing && existing.length > 0 && subtitleWindowStart[subIndex] !== undefined && ssStart >= subtitleWindowStart[subIndex]) {
+            if (existing && existing.length > 0) {
                 paintCue();
-            } else {
+            }
+
+            if (!subtitleWindowStart[subIndex] && (!existing || existing.length === 0)) {
+                const ssStart = (video.currentTime && video.currentTime > 10) ? Math.max(0, Math.floor(video.currentTime) - 5) : 0;
                 subtitleWindowStart[subIndex] = ssStart;
                 fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, ssStart));
             }
@@ -7680,7 +7811,7 @@
                     backendAudioTracks = audioTracks.map((t, idx) => {
                         const codec = (t.codec_name || '').toLowerCase();
                         const channels = t.channels || 2;
-                        const label = trackLabel(t, idx);
+                        const label = trackLabel(t, idx, audioTracks);
                         const isSupported = (codec === 'aac' || codec === 'mp3' || codec === 'opus' || codec === 'vorbis' || codec === 'flac') && channels <= 2;
                         return {
                             index: idx, // 0-based audio index for backend /audio/:audioIndex/:id
@@ -7699,7 +7830,7 @@
 
                     backendSubTracks = subTracks.map((s, idx) => {
                         const isBitmap = isBitmapSubtitle(s);
-                        const label = formatSubtitleLabel(s, idx);
+                        const label = formatSubtitleLabel(s, idx, subTracks);
                         return {
                             index: idx, // 0-based subtitle index for backend /subs/:subIndex/:id
                             streamIndex: s.index,
@@ -7729,6 +7860,15 @@
 
                     renderAudioTrackUI(backendAudioTracks, 0);
                     renderSubTrackUI(backendSubTracks, -1);
+
+                    // Pre-warm the first text subtitle track from ss=0 in background for instant availability
+                    if (backendSubTracks.length > 0) {
+                        const defaultSub = backendSubTracks.find(s => !s.isBitmap && (s.lang.toLowerCase().includes('eng') || s.subIndex === 0)) || backendSubTracks[0];
+                        if (defaultSub && !defaultSub.isBitmap && !parsedSubtitleCues[defaultSub.index]) {
+                            subtitleWindowStart[defaultSub.index] = 0;
+                            fetchSubtitleStream(defaultSub.index, buildSubtitleUrl(defaultSub.index, 0));
+                        }
+                    }
 
                     // Auto-switch to first track if unsupported
                     const hasAudsFilter = new URL(target, window.location.href).searchParams.has('auds');
@@ -7795,6 +7935,10 @@
         video.addEventListener('seeked', () => {
             paintCue();
             refreshSubtitleForSeek();
+            if (activeTrackIdx !== null && audioLoading) {
+                showSpinner();
+                centerIcon.classList.remove('on', 'sticky');
+            }
         });
 
         video.addEventListener('seeking', () => {
@@ -7803,13 +7947,18 @@
             if (!video.paused) {
                 videoWasPlaying = true;
             }
+            audioLoading = true;
+            showSpinner();
+            centerIcon.classList.remove('on', 'sticky');
+            setPlayIcon();
+
             clearTimeout(seekDebounce);
             seekDebounce = setTimeout(() => {
                 const videoTime = video.currentTime;
                 if (activeTrackIdx !== null) {
                     reloadAudio(videoTime);
                 }
-            }, 250);
+            }, 300);
         });
 
         video.addEventListener('waiting', () => {
@@ -7870,11 +8019,15 @@
 
         /* ================= AUDIO & MEDIA TRACKS INSPECTOR ================= */
         function resolveTrackLanguage(lang, name) {
-            let clean = LANG_MAP[(lang || '').toLowerCase()] || lang || '';
+            let clean = EXTENDED_LANG_MAP[(lang || '').toLowerCase()] || lang || '';
             if (!clean || clean.toLowerCase() === 'und') {
                 const lower = (name || '').toLowerCase();
-                for (const [code, lName] of Object.entries(LANG_MAP)) {
+                for (const [code, lName] of Object.entries(EXTENDED_LANG_MAP)) {
                     if (lower.includes(lName.toLowerCase())) return lName;
+                }
+                const cleaned = cleanMediaMetadata(name);
+                if (cleaned && cleaned.length > 1 && !/^\d+$/.test(cleaned)) {
+                    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
                 }
             }
             return clean || 'Audio';
@@ -9229,9 +9382,19 @@
         });
         video.addEventListener('seeked', () => {
             clearTimeout(seekingSpinnerTimer);
+            if (audioLoading) {
+                showSpinner();
+                centerIcon.classList.remove('on', 'sticky');
+                return;
+            }
             if (video.readyState >= 3 && !video.paused) hideSpinner();
         });
         video.addEventListener('playing', () => {
+            if (audioLoading) {
+                showSpinner();
+                centerIcon.classList.remove('on', 'sticky');
+                return;
+            }
             hideSpinner();
             errBox.style.display = 'none';
             setPlayIcon();
