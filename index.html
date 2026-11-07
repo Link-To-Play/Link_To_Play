@@ -7282,10 +7282,48 @@
             reloadAudio(video.currentTime || 0);
         }
 
+        function buildStreamUrlWithAudio(audioIdx) {
+            let target = streamUrl;
+            if (target.includes('/api/proxy?url=')) {
+                try {
+                    const m = target.match(/[?&]url=([^&]+)/);
+                    if (m && m[1]) target = decodeURIComponent(m[1]);
+                } catch (e) { }
+            }
+            const u = new URL(target, window.location.href);
+            if (audioIdx === 0 && !shouldTranscodeDefault) {
+                u.searchParams.delete('aud');
+                u.searchParams.delete('audio');
+            } else {
+                u.searchParams.set('aud', String(audioIdx));
+            }
+            let finalUrl = u.toString();
+            if (typeof getEffectiveStreamUrl === 'function') {
+                finalUrl = getEffectiveStreamUrl(finalUrl);
+            }
+            return finalUrl;
+        }
+
         function switchToDefault() {
             destroyAudio();
             restoreVideoAudio();
-            if (!video.paused) {
+            const targetSrc = buildStreamUrlWithAudio(0);
+            const curSrc = video.currentSrc || video.src;
+            if (curSrc !== targetSrc) {
+                const curTime = isFinite(video.currentTime) ? video.currentTime : 0;
+                const wasPlaying = (!video.paused && !video.ended);
+                video.src = targetSrc;
+                const onReady = () => {
+                    video.removeEventListener('loadedmetadata', onReady);
+                    video.removeEventListener('canplay', onReady);
+                    if (curTime > 0 && isFinite(curTime)) video.currentTime = curTime;
+                    if (wasPlaying) video.play().catch(() => {});
+                    hideSpinner(true);
+                };
+                video.addEventListener('loadedmetadata', onReady, { once: true });
+                video.addEventListener('canplay', onReady, { once: true });
+                video.load();
+            } else if (!video.paused) {
                 video.play().catch(() => { });
             }
         }
@@ -7297,19 +7335,56 @@
             const track = backendAudioTracks[idx];
 
             renderAudioTrackUI(backendAudioTracks, idx);
-            initBackendAudioContext();
 
-            if (idx === 0 && !shouldTranscodeDefault) {
-                switchToDefault();
-                const btn = $('audioTrackBtn');
-                if (btn) btn.classList.remove('dolby-active');
-                showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
-            } else {
-                switchToTrack(track.index);
-                const btn = $('audioTrackBtn');
-                if (btn) btn.classList.add('dolby-active');
-                showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
+            const btn = $('audioTrackBtn');
+            if (btn) {
+                if (idx > 0 || shouldTranscodeDefault) btn.classList.add('dolby-active');
+                else btn.classList.remove('dolby-active');
             }
+            showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
+
+            // Clean up secondary audio and ensure native sound is fully enabled
+            destroyAudio();
+            restoreVideoAudio();
+
+            const newStreamSrc = buildStreamUrlWithAudio(idx);
+            const curSrc = video.currentSrc || video.src;
+            if (curSrc === newStreamSrc) return;
+
+            const curTime = isFinite(video.currentTime) ? video.currentTime : 0;
+            const wasPlaying = (!video.paused && !video.ended);
+
+            showSpinner();
+            video.src = newStreamSrc;
+
+            let readyFired = false;
+            const onStreamReady = () => {
+                if (readyFired) return;
+                readyFired = true;
+                video.removeEventListener('loadedmetadata', onStreamReady);
+                video.removeEventListener('canplay', onStreamReady);
+                if (curTime > 0 && isFinite(curTime)) {
+                    video.currentTime = curTime;
+                }
+                if (wasPlaying) {
+                    video.play().catch(e => console.warn('[Video] resume error:', e.message));
+                }
+                hideSpinner(true);
+            };
+
+            // Fallback to secondary audio transcode if the backend endpoint fails with ?aud=
+            const onErrorFallback = () => {
+                video.removeEventListener('error', onErrorFallback);
+                if (video.error && newStreamSrc.includes('aud=')) {
+                    console.warn('[Backend] Native ?aud= stream returned error, falling back to secondary audio element');
+                    switchToTrack(track.index);
+                }
+            };
+
+            video.addEventListener('loadedmetadata', onStreamReady, { once: true });
+            video.addEventListener('canplay', onStreamReady, { once: true });
+            video.addEventListener('error', onErrorFallback, { once: true });
+            video.load();
         }
 
         /* ── Subtitles Engine (Incremental WebVTT / SRT / ASS Streaming & Custom Overlay) ── */
