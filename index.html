@@ -1163,6 +1163,67 @@
             padding: 2px 6px;
         }
 
+        /* Dedicated Custom Subtitle Overlay */
+        .custom-subs-overlay {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 64px !important;
+            display: none !important;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 0 5% !important;
+            pointer-events: none !important;
+            z-index: 25 !important;
+            transition: bottom 0.2s ease !important;
+        }
+
+        #stage.hide-ui .custom-subs-overlay {
+            bottom: 24px !important;
+        }
+
+        .custom-subs-overlay.on {
+            display: flex !important;
+        }
+
+        .custom-subs-overlay span {
+            display: inline-block !important;
+            background: transparent !important;
+            background-color: transparent !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            font-weight: 600 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+            font-size: 1.25rem !important;
+            line-height: 1.4 !important;
+            letter-spacing: 0.02em !important;
+            color: #ffffff !important;
+            text-align: center !important;
+            text-shadow: 
+                -1.5px -1.5px 0 #000,
+                 1.5px -1.5px 0 #000,
+                -1.5px  1.5px 0 #000,
+                 1.5px  1.5px 0 #000,
+                 0 0 5px rgba(0, 0, 0, 0.9),
+                 0 2px 5px rgba(0, 0, 0, 0.9) !important;
+            white-space: pre-line !important;
+            word-break: break-word !important;
+            max-width: 90% !important;
+        }
+
+        @media (max-width: 768px) {
+            .custom-subs-overlay {
+                bottom: 52px !important;
+                padding: 0 3% !important;
+            }
+            #stage.hide-ui .custom-subs-overlay {
+                bottom: 16px !important;
+            }
+            .custom-subs-overlay span {
+                font-size: 0.95rem !important;
+            }
+        }
+
         /* ============ DOLBY AUDIO FALLBACK NOTIFICATION TOAST ============ */
         .dolby-prompt {
             position: absolute;
@@ -3667,6 +3728,7 @@
     <div id="stage">
         <video id="video" crossorigin="anonymous" playsinline preload="auto"></video>
         <audio id="secondaryAudio" crossorigin="anonymous" preload="auto" style="display:none;"></audio>
+        <div class="custom-subs-overlay" id="custom-subs-overlay"><span id="custom-subs-text"></span></div>
         <script>
             /* Instant Media Buffer Starter: Attach stream and trigger browser media pipeline before parsing rest of page */
             (function () {
@@ -6845,31 +6907,79 @@
         });
 
         /* ================= BACKEND MULTI-TRACK AUDIO & WEBVTT SUBTITLE ENGINE ================= */
-        const ISO_LANG_MAP = {
-            eng: 'English', en: 'English',
-            tam: 'Tamil', ta: 'Tamil',
-            tel: 'Telugu', te: 'Telugu',
-            hin: 'Hindi', hi: 'Hindi',
-            mal: 'Malayalam', ml: 'Malayalam',
-            kan: 'Kannada', kn: 'Kannada',
-            spa: 'Spanish', es: 'Spanish',
-            fre: 'French', fra: 'French', fr: 'French',
-            ger: 'German', deu: 'German', de: 'German',
-            ita: 'Italian', it: 'Italian',
-            jpn: 'Japanese', ja: 'Japanese',
-            kor: 'Korean', ko: 'Korean',
-            chi: 'Chinese', zho: 'Chinese', zh: 'Chinese',
-            rus: 'Russian', ru: 'Russian',
-            ara: 'Arabic', ar: 'Arabic',
-            por: 'Portuguese', pt: 'Portuguese',
-            und: 'Undetermined'
+        const LANG_MAP = {
+            eng:'English', en:'English', hin:'Hindi', hi:'Hindi',
+            tam:'Tamil', ta:'Tamil', tel:'Telugu', te:'Telugu',
+            mal:'Malayalam', ml:'Malayalam', kan:'Kannada', kn:'Kannada',
+            ben:'Bengali', bn:'Bengali', pan:'Punjabi', pa:'Punjabi',
+            guj:'Gujarati', gu:'Gujarati', mar:'Marathi', mr:'Marathi',
+            urd:'Urdu', ur:'Urdu',
+            fre:'French', fra:'French', fr:'French', spa:'Spanish', es:'Spanish',
+            ger:'German', deu:'German', de:'German', rus:'Russian', ru:'Russian',
+            chi:'Chinese', zho:'Chinese', zh:'Chinese', jpn:'Japanese', ja:'Japanese',
+            kor:'Korean', ko:'Korean', ara:'Arabic', ar:'Arabic',
+            por:'Portuguese', pt:'Portuguese', ita:'Italian', it:'Italian',
+            tur:'Turkish', tr:'Turkish', dut:'Dutch', nld:'Dutch', nl:'Dutch'
         };
 
-        function formatLanguage(langCode, title) {
-            if (title && String(title).trim()) return String(title).trim();
-            if (!langCode) return 'Unknown';
-            const code = String(langCode).toLowerCase().trim();
-            return ISO_LANG_MAP[code] || String(langCode).toUpperCase();
+        const LANG_KEYS_MAP = {};
+        for (const [key, name] of Object.entries(LANG_MAP)) {
+            if (!LANG_KEYS_MAP[name]) {
+                LANG_KEYS_MAP[name] = new Set();
+            }
+            LANG_KEYS_MAP[name].add(key.toLowerCase());
+            LANG_KEYS_MAP[name].add(name.toLowerCase());
+            if (name.length > 3) {
+                LANG_KEYS_MAP[name].add(name.substring(0, 3).toLowerCase());
+            }
+        }
+
+        function getMatchedLanguages(track) {
+            const meta = track.tags || {};
+            const lang = (meta.language || meta.LANGUAGE || meta.Language || '').toLowerCase().trim();
+            const title = (meta.title || meta.TITLE || meta.Title || '').toLowerCase().trim();
+            const handler = (meta.handler_name || '').replace(/\x00/g, '').toLowerCase().trim();
+
+            const matched = [];
+            for (const [name, keysSet] of Object.entries(LANG_KEYS_MAP)) {
+                let isMatch = false;
+                if (lang && keysSet.has(lang)) {
+                    isMatch = true;
+                }
+                if (!isMatch) {
+                    for (const key of keysSet) {
+                        const regex = new RegExp('\\b' + key + '\\b', 'i');
+                        if (regex.test(title) || regex.test(handler)) {
+                            isMatch = true;
+                            break;
+                        }
+                    }
+                }
+                if (isMatch) {
+                    matched.push(name);
+                }
+            }
+            return matched;
+        }
+
+        function trackLabel(track, idx) {
+            const matchedLangs = getMatchedLanguages(track);
+            let label = '';
+            if (matchedLangs.length > 0) {
+                label = matchedLangs.join(' + ');
+                if (idx === 0) label += ' (Default)';
+            } else {
+                label = idx === 0 ? 'Default (Embedded)' : `Track ${idx + 1}`;
+                const meta = track.tags || {};
+                const title = (meta.title || meta.TITLE || meta.Title || '').trim();
+                const handler = (meta.handler_name || '').replace(/\x00/g, '').trim();
+                if (title) {
+                    label += ` — ${title}`;
+                } else if (handler && !['sound','audio','track'].some(w => handler.toLowerCase().includes(w))) {
+                    label += ` — ${handler}`;
+                }
+            }
+            return label;
         }
 
         function formatCodecName(codec) {
@@ -6901,67 +7011,557 @@
             return `${ch} ch`;
         }
 
-        let backendInfo = null;
-        let backendAudioTracks = [];
-        let backendSubTracks = [];
-        let activeBackendAudioIndex = 0;
-        let activeBackendSubIndex = -1; // -1 means Off
-        let isSecondaryAudioActive = false;
-        window.isSecondaryAudioActive = false;
-        let audioBaseTime = 0;
-        let isSyncingAudio = false;
-        let audioSyncToken = 0;
-        let backendIntegrationActive = false;
-        window.backendIntegrationActive = false;
-
-        function parseBackendInfo(rawUrl) {
-            if (!rawUrl) return null;
-            let target = String(rawUrl).trim();
-            // Unwrap target URL if already routed through /api/proxy
+        function buildAudioUrl(streamIndex, videoTime) {
+            let target = streamUrl;
             if (target.includes('/api/proxy?url=')) {
                 try {
                     const m = target.match(/[?&]url=([^&]+)/);
                     if (m && m[1]) target = decodeURIComponent(m[1]);
                 } catch (e) { }
             }
-            try {
-                const u = new URL(target, window.location.href);
-                const origin = u.origin;
-                const hash = u.searchParams.get('hash') || '';
-                let id = u.searchParams.get('id') || '';
-                if (!id) {
-                    const parts = u.pathname.split('/').filter(Boolean);
-                    if (parts.length > 0) {
-                        id = parts[parts.length - 1];
-                    }
-                }
-                if (id) {
-                    return {
-                        origin,
-                        id,
-                        hash,
-                        buildUrl(endpoint) {
-                            return `${origin}${endpoint}`;
-                        }
-                    };
-                }
-            } catch (e) {
-                console.warn('[Backend] parseBackendInfo failed:', e);
+            const u = new URL(target, window.location.href);
+            const segs = u.pathname.split('/').filter(Boolean);
+            const id = segs.length > 0 ? segs[segs.length - 1] : '';
+            u.pathname = '/audio/' + streamIndex + '/' + id;
+            u.searchParams.set('ss', Number(videoTime || 0).toFixed(3));
+            let finalUrl = u.toString();
+            if (typeof getEffectiveStreamUrl === 'function') {
+                finalUrl = getEffectiveStreamUrl(finalUrl);
             }
-            return null;
+            return finalUrl;
         }
 
-        function isBrowserSupportedAudio(codec, channels) {
-            if (!codec) return false;
-            const c = String(codec).toLowerCase().trim();
-            // Unsupported Dolby / DTS / HD audio in standard HTML5 video tag:
-            if (/^(ac-?3|e-?ac-?3|ec-?3|dd\+|dts|truehd|mlp)/i.test(c)) return false;
-            // Native browser supported codecs:
-            if (/^(aac|mp3|opus|vorbis|flac)/i.test(c)) {
-                if (channels && channels > 2) return false;
-                return true;
+        function buildSubtitleUrl(streamIndex, ss) {
+            let target = streamUrl;
+            if (target.includes('/api/proxy?url=')) {
+                try {
+                    const m = target.match(/[?&]url=([^&]+)/);
+                    if (m && m[1]) target = decodeURIComponent(m[1]);
+                } catch (e) { }
             }
-            return false;
+            const u = new URL(target, window.location.href);
+            const segs = u.pathname.split('/').filter(Boolean);
+            const id = segs.length > 0 ? segs[segs.length - 1] : '';
+            u.pathname = '/subs/' + streamIndex + '/' + id;
+            const linkHash = u.searchParams.get('hash');
+            u.search = '';
+            if (linkHash) u.searchParams.set('hash', linkHash);
+            if (ss && ss > 0) u.searchParams.set('ss', Number(ss).toFixed(3));
+            let finalUrl = u.toString();
+            if (typeof getEffectiveStreamUrl === 'function') {
+                finalUrl = getEffectiveStreamUrl(finalUrl);
+            }
+            return finalUrl;
+        }
+
+        let activeAudio = null;
+        let activeTrackIdx = null; // null = default
+        let startVideoTime = 0;
+        let seekDebounce = null;
+        let audioLoading = false;
+        let videoWasPlaying = false;
+        let shouldTranscodeDefault = false;
+
+        let backendAudioTracks = [];
+        let backendSubTracks = [];
+        let activeBackendAudioIndex = 0;
+        let activeBackendSubIndex = -1; // -1 = off
+        let backendIntegrationActive = false;
+        window.backendIntegrationActive = false;
+
+        let backendAudioCtx = null;
+        let vidGainNode = null;
+        let useFallbackMute = false;
+
+        function initBackendAudioContext() {
+            if (!video) return;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) {
+                useFallbackMute = true;
+                if (activeTrackIdx !== null) video.muted = true;
+                return;
+            }
+            if (!backendAudioCtx) {
+                try {
+                    backendAudioCtx = new AC();
+                } catch (e) {
+                    console.warn('[AudioCtx] creation failed:', e.message);
+                }
+            }
+            if (backendAudioCtx && backendAudioCtx.state === 'suspended') {
+                backendAudioCtx.resume().catch(() => { });
+            }
+            if (video.__audioConnected) {
+                if (vidGainNode) {
+                    vidGainNode.gain.value = (activeTrackIdx !== null) ? 0 : 1;
+                }
+                return;
+            }
+            video.__audioConnected = true;
+            try {
+                const src = backendAudioCtx.createMediaElementSource(video);
+                if (!vidGainNode) {
+                    vidGainNode = backendAudioCtx.createGain();
+                    vidGainNode.connect(backendAudioCtx.destination);
+                }
+                vidGainNode.gain.value = (activeTrackIdx !== null) ? 0 : 1;
+                src.connect(vidGainNode);
+            } catch (e) {
+                console.warn('[AudioCtx] MediaElementSource failed, using vid.muted fallback:', e.message);
+                useFallbackMute = true;
+                if (activeTrackIdx !== null) video.muted = true;
+            }
+        }
+
+        function silenceVideo() {
+            if (vidGainNode && backendAudioCtx) {
+                try {
+                    vidGainNode.gain.cancelScheduledValues(backendAudioCtx.currentTime);
+                    vidGainNode.gain.setValueAtTime(0, backendAudioCtx.currentTime);
+                    useFallbackMute = false;
+                } catch (e) {
+                    useFallbackMute = true;
+                    video.muted = true;
+                }
+            } else {
+                useFallbackMute = true;
+                video.muted = true;
+            }
+        }
+
+        function restoreVideoAudio() {
+            if (vidGainNode && backendAudioCtx) {
+                try {
+                    vidGainNode.gain.cancelScheduledValues(backendAudioCtx.currentTime);
+                    vidGainNode.gain.setValueAtTime(1, backendAudioCtx.currentTime);
+                    useFallbackMute = false;
+                } catch (e) {
+                    useFallbackMute = false;
+                    video.muted = (isAudioMuted || lastVol === 0);
+                }
+            } else {
+                useFallbackMute = false;
+                video.muted = (isAudioMuted || lastVol === 0);
+            }
+            video.volume = (typeof lastVol === 'number' ? lastVol : 100) / 100;
+        }
+
+        function destroyAudio() {
+            if (!activeAudio) return;
+            activeAudio.oncanplay = null;
+            activeAudio.onerror = null;
+            activeAudio.pause();
+            activeAudio.src = '';
+            activeAudio.load();
+            activeAudio.remove();
+            activeAudio = null;
+            activeTrackIdx = null;
+            audioLoading = false;
+            videoWasPlaying = false;
+            window.isSecondaryAudioActive = false;
+            window.secondaryAudio = null;
+        }
+
+        function reloadAudio(videoTime) {
+            if (activeTrackIdx === null || !activeAudio) return;
+            audioLoading = true;
+            showSpinner();
+
+            // Pause video if currently playing so it doesn't drift while fetching/transcoding
+            if (!video.paused) {
+                videoWasPlaying = true;
+                video.pause();
+            }
+
+            activeAudio.oncanplay = null;
+            activeAudio.onerror = null;
+            activeAudio.pause();
+
+            startVideoTime = videoTime;
+            const url = buildAudioUrl(activeTrackIdx, videoTime);
+            activeAudio.src = url;
+            activeAudio.volume = (typeof lastVol === 'number' ? lastVol : 100) / 100;
+            activeAudio.muted = (isAudioMuted || lastVol === 0);
+            activeAudio.playbackRate = video.playbackRate || 1;
+            activeAudio.load();
+
+            activeAudio.onerror = () => {
+                console.error('[AudioTrack] stream error:', activeAudio.error);
+                audioLoading = false;
+                hideSpinner(true);
+            };
+
+            activeAudio.oncanplay = () => {
+                if (activeTrackIdx === null || !activeAudio) return;
+                audioLoading = false;
+                hideSpinner(true);
+                startVideoTime = video.currentTime;
+
+                if (videoWasPlaying || !video.paused) {
+                    videoWasPlaying = false;
+                    activeAudio.play().then(() => {
+                        video.play().catch(() => { });
+                    }).catch(e => {
+                        console.warn('[AudioTrack] play failed:', e.message);
+                        video.pause();
+                    });
+                } else {
+                    activeAudio.pause();
+                }
+            };
+        }
+
+        function switchToTrack(streamIndex) {
+            initBackendAudioContext();
+            destroyAudio();
+            activeTrackIdx = streamIndex;
+
+            silenceVideo();
+
+            activeAudio = document.createElement('audio');
+            activeAudio.id = 'secondaryAudio';
+            activeAudio.style.display = 'none';
+            document.body.appendChild(activeAudio);
+            window.secondaryAudio = activeAudio;
+            window.isSecondaryAudioActive = true;
+
+            videoWasPlaying = !video.paused;
+            reloadAudio(video.currentTime || 0);
+        }
+
+        function switchToDefault() {
+            const resume = videoWasPlaying;
+            destroyAudio();
+            restoreVideoAudio();
+            if (resume && video.paused) {
+                video.play().catch(() => { });
+            }
+        }
+
+        function selectBackendAudioTrack(idx) {
+            if (!backendAudioTracks || idx < 0 || idx >= backendAudioTracks.length) return;
+            activeBackendAudioIndex = idx;
+            mediaFileInfo.activeAudioIndex = idx;
+            const track = backendAudioTracks[idx];
+
+            renderAudioTrackUI(backendAudioTracks, idx);
+            initBackendAudioContext();
+
+            if (idx === 0 && !shouldTranscodeDefault) {
+                switchToDefault();
+                const btn = $('audioTrackBtn');
+                if (btn) btn.classList.remove('dolby-active');
+                showAudioToast(`${track.lang} [Native ${track.codec}]`);
+            } else {
+                switchToTrack(track.index);
+                const btn = $('audioTrackBtn');
+                if (btn) btn.classList.add('dolby-active');
+                showAudioToast(`${track.lang} [Transcoded AAC]`);
+            }
+        }
+
+        /* ── Subtitles Engine (Incremental WebVTT / SRT / ASS Streaming & Custom Overlay) ── */
+        let parsedSubtitleCues = {};
+        let activeSubtitleStreamIdx = null;
+        let activeBitmapSubIdx = null;
+        let subTimer = null;
+        let currentCueText = '';
+        let subtitleSyncOffset = 0.0;
+        let subtitleWindowStart = {};
+        let activeSubtitleAbortController = null;
+
+        function isBitmapSubtitle(sub) {
+            if (!sub) return false;
+            const codec = (sub.codec_name || '').toLowerCase();
+            return ['sup', 'pgs', 'hdmv_pgs_subtitle', 'sub', 'vobsub', 'dvd_subtitle', 'dvb_subtitle', 'dvbsub', 'xsub'].includes(codec);
+        }
+
+        function formatSubtitleLabel(sub, sIdx) {
+            const matchedLangs = getMatchedLanguages(sub);
+            let langStr = matchedLangs.length > 0 ? matchedLangs.join(' + ') : `Subtitle ${sIdx + 1}`;
+            const meta = sub.tags || {};
+            const title = (meta.title || meta.TITLE || meta.Title || '').trim();
+            let rawCodec = (sub.codec_name || '').toUpperCase();
+            let codecBadge = rawCodec;
+            if (rawCodec === 'SUBRIP' || rawCodec === 'TEXT' || rawCodec === 'TX3G') codecBadge = 'SRT';
+            else if (rawCodec === 'HDMV_PGS_SUBTITLE' || rawCodec === 'SUP') codecBadge = 'PGS';
+            else if (rawCodec === 'DVD_SUBTITLE' || rawCodec === 'VOBSUB') codecBadge = 'VobSub';
+            else if (rawCodec === 'WEBVTT') codecBadge = 'VTT';
+            else if (rawCodec === 'DVB_SUBTITLE') codecBadge = 'DVB';
+
+            let label = langStr;
+            if (title && !label.toLowerCase().includes(title.toLowerCase())) {
+                label += ` — ${title}`;
+            }
+            if (codecBadge) {
+                label += ` (${codecBadge})`;
+            }
+            return label;
+        }
+
+        function currentSubtitleSeekStart() {
+            if (!video || !isFinite(video.currentTime)) return 0;
+            return Math.max(0, video.currentTime - 10);
+        }
+
+        function refreshSubtitleForSeek() {
+            const idx = activeSubtitleStreamIdx;
+            if (idx === null || activeBitmapSubIdx !== null) return;
+            if (subtitleWindowStart[idx] === undefined) return;
+            const t = isFinite(video.currentTime) ? video.currentTime : 0;
+            const cues = parsedSubtitleCues[idx] || [];
+            if (cues.length) {
+                const minS = cues[0].s;
+                const maxE = cues[cues.length - 1].s;
+                if (t >= minS - 2 && t <= maxE + 2) return;
+            } else if (t >= subtitleWindowStart[idx]) {
+                return;
+            }
+            const ssStart = currentSubtitleSeekStart();
+            subtitleWindowStart[idx] = ssStart;
+            fetchSubtitleStream(idx, buildSubtitleUrl(idx, ssStart));
+        }
+
+        function unescapeHTML(str) {
+            if (!str) return '';
+            return str
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'")
+                .replace(/&apos;/g, "'")
+                .replace(/&nbsp;/g, ' ');
+        }
+
+        function cleanCueText(rawText) {
+            if (!rawText) return '';
+            return unescapeHTML(
+                rawText
+                    .replace(/\{[^}]*\}/g, '')
+                    .replace(/\\N/g, '\n')
+                    .replace(/\\n/g, '\n')
+                    .replace(/\\h/g, ' ')
+                    .replace(/<[^>]+>/g, '')
+                    .split('\n')
+                    .map(l => l.trim())
+                    .filter(Boolean)
+                    .join('\n')
+            ).trim();
+        }
+
+        function stamp(txt) {
+            if (!txt) return 0;
+            const bits = txt.trim().split(':');
+            let out = 0;
+            for (let i = 0; i < bits.length; i++) {
+                out = out * 60 + parseFloat(bits[i].replace(',', '.'));
+            }
+            return isFinite(out) ? out : 0;
+        }
+
+        function parseWebVTT(text) {
+            if (!text) return [];
+            const cleanText = text.replace(/^\uFEFF/, '').replace(/\r/g, '');
+            const lines = cleanText.split('\n');
+            const out = [];
+            let i = 0;
+            while (i < lines.length) {
+                const line = lines[i++];
+                if (line.indexOf('-->') === -1) continue;
+                const half = line.split('-->');
+                const from = stamp(half[0]);
+                const to = stamp(half[1].trim().split(/\s+/)[0]);
+                const buf = [];
+                while (i < lines.length && lines[i].trim() !== '') {
+                    buf.push(lines[i++]);
+                }
+                if (to > from) {
+                    const clean = cleanCueText(buf.join('\n'));
+                    if (clean) out.push({ s: from, e: to, t: clean });
+                }
+            }
+            out.sort((a, b) => a.s - b.s);
+            return out;
+        }
+
+        function getSubtitleOverlay() {
+            let overlay = document.getElementById('custom-subs-overlay');
+            if (!overlay && stage) {
+                overlay = document.createElement('div');
+                overlay.className = 'custom-subs-overlay';
+                overlay.id = 'custom-subs-overlay';
+                const span = document.createElement('span');
+                span.id = 'custom-subs-text';
+                overlay.appendChild(span);
+                stage.appendChild(overlay);
+            }
+            return overlay;
+        }
+
+        function paintCue() {
+            if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) {
+                stopSubs();
+                return;
+            }
+            const cues = parsedSubtitleCues[activeSubtitleStreamIdx];
+            const overlay = getSubtitleOverlay();
+            const txtEl = overlay ? overlay.querySelector('span') : null;
+            if (!cues || cues.length === 0) {
+                if (overlay) overlay.classList.remove('on');
+                if (txtEl) txtEl.textContent = '';
+                currentCueText = '';
+                return;
+            }
+
+            const t = (video.currentTime || 0) + subtitleSyncOffset;
+            const activeCues = [];
+            for (let i = 0; i < cues.length; i++) {
+                const c = cues[i];
+                if (t >= c.s && t <= c.e) {
+                    activeCues.push(c.t);
+                } else if (c.s > t + 2) {
+                    break;
+                }
+            }
+
+            const joinedText = activeCues.join('\n');
+            if (joinedText === currentCueText) return;
+            currentCueText = joinedText;
+
+            if (!joinedText) {
+                if (overlay) overlay.classList.remove('on');
+                if (txtEl) txtEl.textContent = '';
+            } else {
+                if (txtEl) txtEl.textContent = joinedText;
+                if (overlay) overlay.classList.add('on');
+            }
+        }
+
+        function stopSubs() {
+            if (subTimer) clearInterval(subTimer);
+            subTimer = null;
+            currentCueText = '';
+            const overlay = document.getElementById('custom-subs-overlay');
+            const txtEl = overlay ? overlay.querySelector('span') : null;
+            if (overlay) overlay.classList.remove('on');
+            if (txtEl) txtEl.textContent = '';
+        }
+
+        async function fetchSubtitleStream(subIndex, url) {
+            if (activeSubtitleAbortController) {
+                try { activeSubtitleAbortController.abort(); } catch (e) { }
+            }
+            activeSubtitleAbortController = new AbortController();
+
+            try {
+                const res = await fetch(url, { signal: activeSubtitleAbortController.signal });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+
+                if (res.body && typeof res.body.getReader === 'function') {
+                    const reader = res.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let vttBuffer = '';
+                    let consumed = 0;
+                    const cues = [];
+                    parsedSubtitleCues[subIndex] = cues;
+
+                    const drainCompleteBlocks = () => {
+                        const lastBreak = vttBuffer.lastIndexOf('\n\n');
+                        if (lastBreak === -1) return;
+                        const end = lastBreak + 2;
+                        if (end <= consumed) return;
+                        const parsed = parseWebVTT(vttBuffer.slice(consumed, end));
+                        consumed = end;
+                        for (let i = 0; i < parsed.length; i++) cues.push(parsed[i]);
+                    };
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        let text = decoder.decode(value, { stream: true }).replace(/\r/g, '');
+                        if (consumed === 0 && vttBuffer === '') text = text.replace(/^\uFEFF/, '');
+                        vttBuffer += text;
+                        drainCompleteBlocks();
+                        paintCue();
+                    }
+                    vttBuffer += decoder.decode().replace(/\r/g, '');
+                    drainCompleteBlocks();
+                    paintCue();
+                } else {
+                    const vttText = await res.text();
+                    parsedSubtitleCues[subIndex] = parseWebVTT(vttText);
+                    paintCue();
+                }
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    console.error('[Subtitles] Failed to stream subtitles:', err);
+                }
+            }
+        }
+
+        function selectSubtitleTrack(subIndex) {
+            stopSubs();
+            activeSubtitleStreamIdx = subIndex;
+            activeBackendSubIndex = subIndex;
+            currentCueText = '';
+
+            if (subIndex === null || subIndex === -1) {
+                activeSubtitleStreamIdx = null;
+                activeBackendSubIndex = -1;
+                renderSubTrackUI(backendSubTracks, -1);
+                if (subTrackBtn) subTrackBtn.classList.remove('sub-active');
+                showSubToast('Subtitles: Off');
+                return;
+            }
+
+            const track = backendSubTracks.find(t => t.index === subIndex);
+            if (!track) return;
+
+            if (track.isBitmap) {
+                activeBitmapSubIdx = subIndex;
+                showSubToast('Bitmap subtitles only supported in VLC/external player');
+                return;
+            }
+
+            activeBitmapSubIdx = null;
+            getSubtitleOverlay();
+            subTimer = setInterval(paintCue, 100);
+
+            const ssStart = currentSubtitleSeekStart();
+            const existing = parsedSubtitleCues[subIndex];
+            if (existing && existing.length > 0 && subtitleWindowStart[subIndex] !== undefined && ssStart >= subtitleWindowStart[subIndex]) {
+                paintCue();
+            } else {
+                subtitleWindowStart[subIndex] = ssStart;
+                fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, ssStart));
+            }
+
+            renderSubTrackUI(backendSubTracks, subIndex);
+            if (subTrackBtn) subTrackBtn.classList.add('sub-active');
+            showSubToast(`Subtitles: ${track.lang}`);
+        }
+
+        function cycleSubtitleTrack() {
+            if (!backendSubTracks || backendSubTracks.length === 0) {
+                showSubToast('No subtitles available');
+                return;
+            }
+            const textSubs = backendSubTracks.filter(t => !t.isBitmap);
+            if (textSubs.length === 0) {
+                showSubToast('Bitmap subtitles only supported in VLC/external player');
+                return;
+            }
+            if (activeBackendSubIndex === -1 || activeBackendSubIndex === null) {
+                selectSubtitleTrack(textSubs[0].index);
+            } else {
+                const curPos = textSubs.findIndex(t => t.index === activeBackendSubIndex);
+                if (curPos >= 0 && curPos < textSubs.length - 1) {
+                    selectSubtitleTrack(textSubs[curPos + 1].index);
+                } else {
+                    selectSubtitleTrack(-1);
+                }
+            }
         }
 
         function showSubToast(msg) {
@@ -6979,7 +7579,7 @@
             }
 
             let html = `
-                <button class="st-track-pill ${activeIndex === -1 ? 'active' : ''}" data-sub-index="-1">
+                <button class="st-track-pill ${(activeIndex === -1 || activeIndex === null) ? 'active' : ''}" data-sub-index="-1">
                     <div class="st-pill-info">
                         <span class="st-pill-name">Off</span>
                         <span class="st-pill-meta">Subtitles hidden</span>
@@ -6989,15 +7589,13 @@
             `;
 
             tracks.forEach((t) => {
-                const isActive = t.subIndex === activeIndex;
-                const lang = t.lang || t.title || `Track ${t.subIndex + 1}`;
-                const codec = t.codec || 'SRT';
-                const extra = [codec, t.isBitmap ? 'Bitmap' : 'Text'].filter(Boolean).join(' • ');
+                const isActive = t.index === activeIndex;
+                const extra = [t.codec, t.isBitmap ? 'Bitmap' : 'Text'].filter(Boolean).join(' • ');
 
                 html += `
-                    <button class="st-track-pill ${isActive ? 'active' : ''}" data-sub-index="${t.subIndex}">
+                    <button class="st-track-pill ${isActive ? 'active' : ''}" data-sub-index="${t.index}">
                         <div class="st-pill-info">
-                            <span class="st-pill-name">${escapeHtml(lang)}</span>
+                            <span class="st-pill-name">${escapeHtml(t.lang)}</span>
                             <span class="st-pill-meta">${escapeHtml(extra)}</span>
                         </div>
                         <span class="st-pill-check">✓</span>
@@ -7026,312 +7624,122 @@
             });
         }
 
-        function selectSubtitleTrack(subIndex) {
-            if (subIndex === -1) {
-                // Turn subtitles off
-                video.querySelectorAll('track').forEach(t => t.remove());
-                for (let i = 0; i < video.textTracks.length; i++) {
-                    video.textTracks[i].mode = 'disabled';
-                }
-                activeBackendSubIndex = -1;
-                renderSubTrackUI(backendSubTracks, -1);
-                if (subTrackBtn) subTrackBtn.classList.remove('sub-active');
-                showSubToast('Subtitles: Off');
-                return;
-            }
-
-            const track = backendSubTracks.find(t => t.subIndex === subIndex);
-            if (!track) return;
-
-            if (track.isBitmap) {
-                showSubToast('Bitmap subtitles only supported in VLC/external player');
-                return;
-            }
-
-            // Remove existing tracks
-            video.querySelectorAll('track').forEach(t => t.remove());
-
-            const trackEl = document.createElement('track');
-            trackEl.kind = 'subtitles';
-            const lang = track.tagsLang || track.lang || 'en';
-            const label = track.title || track.lang || `Track ${track.subIndex + 1}`;
-            trackEl.label = label;
-            trackEl.srclang = lang;
-            trackEl.default = true;
-
-            const subUrl = backendInfo.buildUrl(`/subs/${track.subIndex}/${backendInfo.id}?hash=${backendInfo.hash}&ss=0`);
-            trackEl.src = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(subUrl) : subUrl;
-
-            video.appendChild(trackEl);
-
-            const activate = () => {
-                for (let i = 0; i < video.textTracks.length; i++) {
-                    const tt = video.textTracks[i];
-                    if (tt.label === label || tt.language === lang || i === video.textTracks.length - 1) {
-                        tt.mode = 'showing';
-                    } else {
-                        tt.mode = 'disabled';
-                    }
-                }
-            };
-            trackEl.addEventListener('load', activate);
-            setTimeout(activate, 50);
-            setTimeout(activate, 250);
-
-            activeBackendSubIndex = subIndex;
-            renderSubTrackUI(backendSubTracks, subIndex);
-            if (subTrackBtn) subTrackBtn.classList.add('sub-active');
-            showSubToast(`Subtitles: ${label}`);
-        }
-
-        function cycleSubtitleTrack() {
-            if (!backendSubTracks || backendSubTracks.length === 0) {
-                showSubToast('No subtitles available');
-                return;
-            }
-            const textSubs = backendSubTracks.filter(t => !t.isBitmap);
-            if (textSubs.length === 0) {
-                showSubToast('Bitmap subtitles only supported in VLC/external player');
-                return;
-            }
-            if (activeBackendSubIndex === -1) {
-                selectSubtitleTrack(textSubs[0].subIndex);
-            } else {
-                const curPos = textSubs.findIndex(t => t.subIndex === activeBackendSubIndex);
-                if (curPos >= 0 && curPos < textSubs.length - 1) {
-                    selectSubtitleTrack(textSubs[curPos + 1].subIndex);
-                } else {
-                    selectSubtitleTrack(-1); // Toggle off
-                }
-            }
-        }
-
-        async function syncAudioSeek(ss, targetAudioIdx = activeBackendAudioIndex, autoResume = !video.paused) {
-            if (!backendInfo || !secondaryAudio || targetAudioIdx < 0) return;
-            const currentToken = ++audioSyncToken;
-            isSyncingAudio = true;
-            audioBaseTime = ss;
-
-            // Pause video and show buffering spinner during TTFB buffer delay
-            video.pause();
-            showSpinner();
-
-            const audioEndpoint = `/audio/${targetAudioIdx}/${backendInfo.id}?hash=${backendInfo.hash}&ss=${ss}`;
-            const fullAudioUrl = backendInfo.buildUrl(audioEndpoint);
-            const effectiveAudioUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(fullAudioUrl) : fullAudioUrl;
-
-            secondaryAudio.src = effectiveAudioUrl;
-            secondaryAudio.load();
-            secondaryAudio.playbackRate = video.playbackRate || 1;
-            secondaryAudio.volume = (typeof lastVol === 'number' ? lastVol : 100) / 100;
-            secondaryAudio.muted = (isAudioMuted || lastVol === 0);
-
-            const waitAudio = new Promise(resolve => {
-                if (secondaryAudio.readyState >= 3) return resolve();
-                const onReady = () => {
-                    secondaryAudio.removeEventListener('canplay', onReady);
-                    secondaryAudio.removeEventListener('error', onErr);
-                    resolve();
-                };
-                const onErr = () => {
-                    secondaryAudio.removeEventListener('canplay', onReady);
-                    secondaryAudio.removeEventListener('error', onErr);
-                    resolve();
-                };
-                secondaryAudio.addEventListener('canplay', onReady, { once: true });
-                secondaryAudio.addEventListener('error', onErr, { once: true });
-                setTimeout(resolve, 7000);
-            });
-
-            const waitVideo = new Promise(resolve => {
-                if (video.readyState >= 3) return resolve();
-                const onReady = () => {
-                    video.removeEventListener('canplay', onReady);
-                    resolve();
-                };
-                video.addEventListener('canplay', onReady, { once: true });
-                setTimeout(resolve, 7000);
-            });
-
-            await Promise.all([waitAudio, waitVideo]);
-
-            if (currentToken !== audioSyncToken) return; // Superseded by newer seek
-
-            isSyncingAudio = false;
-            hideSpinner(true);
-
-            if (autoResume) {
+        async function fetchBackendTracks(url) {
+            if (!url) return null;
+            let target = url;
+            if (target.includes('/api/proxy?url=')) {
                 try {
-                    await Promise.all([
-                        video.play().catch(e => console.warn('video play blocked:', e)),
-                        secondaryAudio.play().catch(e => console.warn('audio play blocked:', e))
-                    ]);
+                    const m = target.match(/[?&]url=([^&]+)/);
+                    if (m && m[1]) target = decodeURIComponent(m[1]);
                 } catch (e) { }
             }
-        }
-
-        function checkDrift() {
-            if (!isSecondaryAudioActive || isSyncingAudio || !secondaryAudio || video.paused || video.seeking) return;
-            if (secondaryAudio.readyState < 2) return;
-
-            const currentAudioTime = audioBaseTime + secondaryAudio.currentTime;
-            const drift = (video.currentTime || 0) - currentAudioTime;
-            const absDrift = Math.abs(drift);
-            const baseRate = video.playbackRate || 1;
-
-            if (absDrift > 2.0) {
-                console.log(`[DriftLock] Large drift detected (${drift.toFixed(2)}s). Resyncing audio.`);
-                syncAudioSeek(Math.floor(video.currentTime || 0), activeBackendAudioIndex, true);
-            } else if (absDrift > 0.25) {
-                // Adjust audio playbackRate slightly to pull into lock
-                const nudgeFactor = drift > 0 ? 1.05 : 0.95;
-                secondaryAudio.playbackRate = baseRate * nudgeFactor;
-            } else if (absDrift <= 0.08 && secondaryAudio.playbackRate !== baseRate) {
-                // Fully aligned: restore standard rate
-                secondaryAudio.playbackRate = baseRate;
-            }
-        }
-
-        // 250ms interval continuous drift monitor
-        setInterval(checkDrift, 250);
-
-        async function selectBackendAudioTrack(index) {
-            if (!backendAudioTracks || index < 0 || index >= backendAudioTracks.length) return;
-            activeBackendAudioIndex = index;
-            mediaFileInfo.activeAudioIndex = index;
-            const track = backendAudioTracks[index];
-
-            renderAudioTrackUI(backendAudioTracks, index);
-
-            // If Track 0 and browser supported native AAC/MP3:
-            if (index === 0 && track.isBrowserSupported) {
-                isSecondaryAudioActive = false;
-                window.isSecondaryAudioActive = false;
-                if (secondaryAudio) {
-                    secondaryAudio.pause();
-                    secondaryAudio.removeAttribute('src');
-                    secondaryAudio.load();
-                }
-                if (window.clientAudioEngine && clientAudioEngine.active) {
-                    clientAudioEngine.deactivate();
-                }
-                video.muted = (isAudioMuted || lastVol === 0);
-                video.volume = (lastVol || 100) / 100;
-                const btn = $('audioTrackBtn');
-                if (btn) btn.classList.remove('dolby-active');
-                showAudioToast(`${track.lang} [Native ${track.codec}]`);
-                return;
-            }
-
-            // Secondary audio or unsupported codec: route through secondary <audio>
-            isSecondaryAudioActive = true;
-            window.isSecondaryAudioActive = true;
-            if (window.clientAudioEngine && clientAudioEngine.active) {
-                clientAudioEngine.deactivate();
-            }
-            video.muted = true; // Silence native video
-
-            const btn = $('audioTrackBtn');
-            if (btn) btn.classList.add('dolby-active');
-
-            const label = `${track.lang} [${track.codec} ${track.channels}]`;
-            showAudioToast(label);
-
-            const seekSec = Math.floor(video.currentTime || 0);
-            await syncAudioSeek(seekSec, index, !video.paused);
-        }
-
-        async function fetchBackendTracks(url) {
-            backendInfo = parseBackendInfo(url);
-            if (!backendInfo) return null;
-
-            const apiUrl = backendInfo.buildUrl(`/api/tracks/${backendInfo.id}?hash=${backendInfo.hash}`);
-            const effectiveApiUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(apiUrl) : apiUrl;
+            const u = new URL(target, window.location.href);
+            const seg = u.pathname.split('/').filter(Boolean).pop();
+            const auds = u.searchParams.get('auds');
+            const hash = u.searchParams.get('hash');
+            u.pathname = '/api/tracks/' + seg;
+            u.search = '';
+            if (hash) u.searchParams.set('hash', hash);
+            if (auds) u.searchParams.set('auds', auds);
+            const apiUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(u.toString()) : u.toString();
 
             try {
-                const res = await fetch(effectiveApiUrl, {
+                const res = await fetch(apiUrl, {
                     headers: { 'Accept': 'application/json' },
-                    signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+                    signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                const data = await res.json();
-                if (Array.isArray(data) && data.length > 0) {
-                    console.log('[Backend] Successfully loaded track specifications:', data);
+                const tracks = await res.json();
+                if (Array.isArray(tracks) && tracks.length >= 1) {
+                    console.log('[Backend] Successfully loaded track specifications:', tracks);
                     backendIntegrationActive = true;
                     window.backendIntegrationActive = true;
 
-                    // Filter AUDIO streams (strictly 0-based audioIndex)
-                    const rawAudio = data.filter(t => t.codec_type === 'audio');
-                    backendAudioTracks = rawAudio.map((t, idx) => {
-                        const codec = t.codec_name || '';
+                    const audioTracks = tracks.filter(t => {
+                        const ctype = (t.codec_type || t.type || '').toLowerCase();
+                        const codec = (t.codec_name || '').toLowerCase();
+                        const isSub = ctype === 'subtitle' || ctype === 'subtitles' || [
+                            'srt', 'ass', 'ssa', 'vtt', 'webvtt', 'subrip', 'mov_text', 'tx3g', 'sup', 'pgs', 'sub', 'vobsub', 'dvb_subtitle', 'sami', 'microdvd', 'teletext', 'cc', 'ttml', 'arib_caption', 'xsub'
+                        ].includes(codec);
+                        if (ctype === 'audio') return true;
+                        if (isSub) return false;
+                        return true;
+                    });
+
+                    const subTracks = tracks.filter(t => {
+                        const ctype = (t.codec_type || t.type || '').toLowerCase();
+                        const codec = (t.codec_name || '').toLowerCase();
+                        return ctype === 'subtitle' || ctype === 'subtitles' || [
+                            'srt', 'ass', 'ssa', 'vtt', 'webvtt', 'subrip', 'mov_text', 'tx3g', 'sup', 'pgs', 'sub', 'vobsub', 'dvb_subtitle', 'sami', 'microdvd', 'teletext', 'cc', 'ttml', 'arib_caption', 'xsub'
+                        ].includes(codec);
+                    });
+
+                    backendAudioTracks = audioTracks.map((t, idx) => {
+                        const codec = (t.codec_name || '').toLowerCase();
                         const channels = t.channels || 2;
-                        const langCode = t.tags?.language || t.tags?.lang || '';
-                        const rawTitle = t.tags?.title || '';
-                        const langName = formatLanguage(langCode, rawTitle);
-                        const isSupported = isBrowserSupportedAudio(codec, channels);
+                        const label = trackLabel(t, idx);
+                        const isSupported = (codec === 'aac' || codec === 'mp3' || codec === 'opus' || codec === 'vorbis' || codec === 'flac') && channels <= 2;
                         return {
-                            index: t.index,
-                            audioIndex: idx, // 0-based among audio
-                            codec: formatCodecName(codec),
-                            rawCodec: codec,
+                            index: t.index, // FFmpeg stream index!
+                            audioIndex: idx,
+                            codec: formatCodecName(t.codec_name),
+                            rawCodec: t.codec_name,
                             channels: formatChannels(channels),
                             rawChannels: channels,
-                            lang: langName,
-                            name: rawTitle || langName,
-                            title: rawTitle,
+                            lang: label,
+                            name: label,
                             isBrowserSupported: isSupported,
                             isDolby: !isSupported
                         };
                     });
 
-                    // Filter SUBTITLE streams (strictly 0-based subIndex)
-                    const rawSubs = data.filter(t => t.codec_type === 'subtitle');
-                    backendSubTracks = rawSubs.map((t, idx) => {
-                        const codec = t.codec_name || '';
-                        const langCode = t.tags?.language || t.tags?.lang || '';
-                        const rawTitle = t.tags?.title || '';
-                        const langName = formatLanguage(langCode, rawTitle);
-                        const isBitmap = /^(hdmv_pgs|pgs|vobsub|dvd_sub|dvdsub|xsub|dvb)/i.test(codec);
+                    backendSubTracks = subTracks.map((s, idx) => {
+                        const isBitmap = isBitmapSubtitle(s);
+                        const label = formatSubtitleLabel(s, idx);
                         return {
-                            index: t.index,
-                            subIndex: idx, // 0-based among subtitles
-                            codec: formatCodecName(codec),
-                            rawCodec: codec,
-                            lang: langName,
-                            tagsLang: langCode,
-                            title: rawTitle || langName,
+                            index: s.index, // FFmpeg stream index!
+                            subIndex: idx,
+                            codec: formatCodecName(s.codec_name),
+                            rawCodec: s.codec_name,
+                            lang: label,
+                            name: label,
                             isBitmap
                         };
                     });
+
+                    // Check if default track needs transcoding
+                    shouldTranscodeDefault = false;
+                    const firstTrack = audioTracks[0];
+                    if (firstTrack && firstTrack.codec_name) {
+                        const codec = firstTrack.codec_name.toLowerCase();
+                        if (codec === 'ac3' || codec === 'eac3' || codec === 'dts' || codec === 'truehd') {
+                            shouldTranscodeDefault = true;
+                        }
+                    }
 
                     // Update media info display
                     mediaFileInfo.audioTracks = backendAudioTracks;
                     mediaFileInfo.subTracks = backendSubTracks;
                     updateMediaInfoDisplay();
 
-                    // Render UI track selectors
                     renderAudioTrackUI(backendAudioTracks, 0);
                     renderSubTrackUI(backendSubTracks, -1);
 
-                    // Auto-select Track 0
-                    if (backendAudioTracks.length > 0) {
-                        const t0 = backendAudioTracks[0];
-                        if (t0.isBrowserSupported) {
-                            console.log('[Backend] Track 0 is browser-supported (' + t0.codec + '), native audio active.');
-                            video.muted = (isAudioMuted || lastVol === 0);
-                            video.volume = (lastVol || 100) / 100;
-                            isSecondaryAudioActive = false;
-                            window.isSecondaryAudioActive = false;
-                        } else {
-                            console.log('[Backend] Track 0 is ' + t0.codec + ', engaging transcoded secondary audio.');
-                            selectBackendAudioTrack(0);
-                        }
+                    // Auto-switch to first track if unsupported
+                    const hasAudsFilter = new URL(target, window.location.href).searchParams.has('auds');
+                    if (shouldTranscodeDefault || hasAudsFilter) {
+                        console.log(`[AudioTrack] Auto-switching to first selected track: ${firstTrack.index}`);
+                        selectBackendAudioTrack(0);
+                    } else {
+                        console.log(`[AudioTrack] Native audio codec detected (${firstTrack?.codec_name || 'AAC'}), zero overhead.`);
+                        video.muted = (isAudioMuted || lastVol === 0);
+                        video.volume = (lastVol || 100) / 100;
                     }
 
-                    return data;
+                    return tracks;
                 }
             } catch (err) {
-                console.log('[Backend] /api/tracks not available or failed, using client fallback:', err);
+                console.log('[Backend] /api/tracks not available or failed:', err);
                 backendIntegrationActive = false;
                 window.backendIntegrationActive = false;
             }
@@ -7339,23 +7747,17 @@
         }
 
         function resetBackendSync() {
-            backendInfo = null;
+            destroyAudio();
+            stopSubs();
             backendAudioTracks = [];
             backendSubTracks = [];
             activeBackendAudioIndex = 0;
             activeBackendSubIndex = -1;
-            isSecondaryAudioActive = false;
-            window.isSecondaryAudioActive = false;
             backendIntegrationActive = false;
             window.backendIntegrationActive = false;
-            isSyncingAudio = false;
-            audioBaseTime = 0;
-            if (secondaryAudio) {
-                secondaryAudio.pause();
-                secondaryAudio.removeAttribute('src');
-                secondaryAudio.load();
-            }
-            video.querySelectorAll('track').forEach(t => t.remove());
+            shouldTranscodeDefault = false;
+            parsedSubtitleCues = {};
+            subtitleWindowStart = {};
             const aBtn = $('audioTrackBtn');
             if (aBtn) aBtn.classList.remove('dolby-active');
             const sBtn = $('subTrackBtn');
@@ -7365,44 +7767,75 @@
 
         // Secondary Audio Element Synchronization Listeners
         video.addEventListener('play', () => {
-            if (isSecondaryAudioActive && secondaryAudio) {
-                secondaryAudio.playbackRate = video.playbackRate || 1;
-                secondaryAudio.play().catch(() => { });
+            if (backendAudioCtx && backendAudioCtx.state === 'suspended') {
+                backendAudioCtx.resume().catch(() => { });
+            }
+            if (activeTrackIdx === null || !activeAudio) return;
+            if (audioLoading) {
+                videoWasPlaying = true;
+                video.pause();
+            } else {
+                activeAudio.play().catch(() => { });
             }
         });
+
         video.addEventListener('pause', () => {
-            if (isSecondaryAudioActive && secondaryAudio) {
-                secondaryAudio.pause();
-            }
+            if (activeAudio) activeAudio.pause();
         });
-        video.addEventListener('ratechange', () => {
-            if (isSecondaryAudioActive && secondaryAudio) {
-                secondaryAudio.playbackRate = video.playbackRate || 1;
-            }
-        });
-        video.addEventListener('seeking', () => {
-            if (isSecondaryAudioActive && secondaryAudio) {
-                secondaryAudio.pause();
-            }
-        });
-        video.addEventListener('seeked', () => {
-            if (isSecondaryAudioActive) {
-                syncAudioSeek(Math.floor(video.currentTime || 0), activeBackendAudioIndex, !video.paused);
-            }
-        });
-        video.addEventListener('waiting', () => {
-            if (isSecondaryAudioActive && secondaryAudio) {
-                secondaryAudio.pause();
-            }
-        });
-        video.addEventListener('playing', () => {
-            if (isSecondaryAudioActive && secondaryAudio && !isSyncingAudio) {
-                secondaryAudio.play().catch(() => { });
-            }
-        });
+
         video.addEventListener('timeupdate', () => {
-            if (isSecondaryAudioActive) {
-                checkDrift();
+            paintCue();
+        });
+
+        video.addEventListener('seeked', () => {
+            paintCue();
+            refreshSubtitleForSeek();
+        });
+
+        video.addEventListener('seeking', () => {
+            paintCue();
+            if (activeTrackIdx === null || !activeAudio) return;
+            if (!video.paused) {
+                videoWasPlaying = true;
+            }
+            clearTimeout(seekDebounce);
+            seekDebounce = setTimeout(() => {
+                const videoTime = video.currentTime;
+                if (activeTrackIdx !== null) {
+                    reloadAudio(videoTime);
+                }
+            }, 250);
+        });
+
+        video.addEventListener('waiting', () => {
+            if (activeAudio) activeAudio.pause();
+        });
+
+        video.addEventListener('playing', () => {
+            if (activeTrackIdx === null || !activeAudio) return;
+            if (audioLoading) {
+                video.pause();
+                videoWasPlaying = true;
+            } else {
+                const drift = video.currentTime - (startVideoTime + activeAudio.currentTime);
+                if (Math.abs(drift) > 2.0) {
+                    console.log('[AudioTrack] Sync drift detected (' + drift.toFixed(2) + 's). Reloading...');
+                    reloadAudio(video.currentTime);
+                } else {
+                    activeAudio.play().catch(() => { });
+                }
+            }
+        });
+
+        video.addEventListener('ratechange', () => {
+            if (activeAudio) activeAudio.playbackRate = video.playbackRate;
+        });
+
+        video.addEventListener('volumechange', () => {
+            if (!activeAudio || activeTrackIdx === null) return;
+            activeAudio.volume = (typeof lastVol === 'number' ? lastVol : 100) / 100;
+            if (!useFallbackMute) {
+                activeAudio.muted = isAudioMuted || (lastVol === 0);
             }
         });
 
@@ -7431,30 +7864,6 @@
         }
 
         /* ================= AUDIO & MEDIA TRACKS INSPECTOR ================= */
-        const LANG_MAP = {
-            hin: 'Hindi', hi: 'Hindi',
-            eng: 'English', en: 'English',
-            tam: 'Tamil', ta: 'Tamil',
-            tel: 'Telugu', te: 'Telugu',
-            mal: 'Malayalam', ml: 'Malayalam',
-            kan: 'Kannada', kn: 'Kannada',
-            ben: 'Bengali', bn: 'Bengali',
-            mar: 'Marathi', mr: 'Marathi',
-            pan: 'Punjabi', pa: 'Punjabi',
-            guj: 'Gujarati', gu: 'Gujarati',
-            urd: 'Urdu', ur: 'Urdu',
-            spa: 'Spanish', es: 'Spanish',
-            fre: 'French', fra: 'French', fr: 'French',
-            ger: 'German', deu: 'German', de: 'German',
-            jpn: 'Japanese', ja: 'Japanese',
-            kor: 'Korean', ko: 'Korean',
-            rus: 'Russian', ru: 'Russian',
-            ita: 'Italian', it: 'Italian',
-            por: 'Portuguese', pt: 'Portuguese',
-            chi: 'Chinese', zho: 'Chinese', zh: 'Chinese',
-            ara: 'Arabic', ar: 'Arabic'
-        };
-
         function resolveTrackLanguage(lang, name) {
             let clean = LANG_MAP[(lang || '').toLowerCase()] || lang || '';
             if (!clean || clean.toLowerCase() === 'und') {
