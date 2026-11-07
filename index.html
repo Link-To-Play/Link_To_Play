@@ -5450,36 +5450,32 @@
             }
         }
         function setPlayIcon() {
-            const isBuffering = audioLoading && videoWasPlaying;
-            const playing = (!video.paused && !video.ended) || isBuffering;
+            const playing = (!video.paused && !video.ended);
             icoPlay.style.display = playing ? 'none' : 'block';
             icoPause.style.display = playing ? 'block' : 'none';
         }
         function togglePlay() {
-            if (audioLoading) {
-                if (videoWasPlaying) {
-                    // User explicitly wants to pause while buffering
-                    videoWasPlaying = false;
-                    hideSpinner(true);
-                    setPlayIcon();
-                    showCenter(D_PAUSE, false, () => { showCenter(D_PLAY, true); });
-                } else {
-                    // User wants to play
-                    videoWasPlaying = true;
-                    showSpinner();
-                    centerIcon.classList.remove('on', 'sticky');
-                    setPlayIcon();
-                }
-                return;
-            }
             if (video.paused || video.ended) {
-                if (video.readyState < 3) showSpinner();
-                video.play().catch(() => {
-                    hideSpinner(true);
-                    showCenter(D_PLAY, true);
-                });
+                if (video.readyState < 3 && !video.seeking) showSpinner();
+                if (window.secondaryAudio && !audioLoading) {
+                    try { window.secondaryAudio.play().catch(() => {}); } catch (e) {}
+                }
+                const p = video.play();
+                if (p && p.catch) {
+                    p.catch(err => {
+                        console.warn('[Video] Play interrupted:', err.message);
+                        hideSpinner(true);
+                        showCenter(D_PLAY, true);
+                        setPlayIcon();
+                    });
+                }
+                setPlayIcon();
             } else {
                 video.pause();
+                if (window.secondaryAudio) {
+                    try { window.secondaryAudio.pause(); } catch (e) {}
+                }
+                setPlayIcon();
             }
         }
         playBtn.addEventListener('click', togglePlay);
@@ -5499,32 +5495,27 @@
         });
 
         video.addEventListener('play', () => {
-            if (audioLoading) {
-                videoWasPlaying = true;
-                video.pause();
-                showSpinner();
-                centerIcon.classList.remove('on', 'sticky');
-                setPlayIcon();
-                return;
-            }
             setPlayIcon();
             requestWakeLock();
+            if (window.secondaryAudio && !audioLoading) {
+                window.secondaryAudio.play().catch(() => {});
+            }
             showCenter(D_PLAY, false);              /* flash play → fade out */
         });
         video.addEventListener('pause', () => {
-            if (audioLoading) {
-                showSpinner();
-                centerIcon.classList.remove('on', 'sticky');
-                setPlayIcon();
-                return;
+            if (window.secondaryAudio) {
+                try { window.secondaryAudio.pause(); } catch (e) {}
             }
-            if (!video.seeking && video.readyState >= 3) hideSpinner(true);
+            if (!video.seeking && video.readyState >= 3 && !audioLoading) hideSpinner(true);
             setPlayIcon();
             releaseWakeLock();
             /* brief pause glyph acknowledges the click, then sticky play icon */
             showCenter(D_PAUSE, false, () => { if (video.paused || video.ended) showCenter(D_PLAY, true); });
         });
         video.addEventListener('ended', () => {
+            if (window.secondaryAudio) {
+                try { window.secondaryAudio.pause(); } catch (e) {}
+            }
             setPlayIcon();
             releaseWakeLock();
             showCenter(D_PLAY, true);
@@ -7082,7 +7073,8 @@
             const segs = u.pathname.split('/').filter(Boolean);
             const id = segs.length > 0 ? segs[segs.length - 1] : '';
             u.pathname = '/audio/' + streamIndex + '/' + id;
-            u.searchParams.set('ss', Number(videoTime || 0).toFixed(3));
+            const ssSec = Math.floor(videoTime || 0);
+            u.searchParams.set('ss', String(ssSec));
             let finalUrl = u.toString();
             if (typeof getEffectiveStreamUrl === 'function') {
                 finalUrl = getEffectiveStreamUrl(finalUrl);
@@ -7105,7 +7097,8 @@
             const linkHash = u.searchParams.get('hash');
             u.search = '';
             if (linkHash) u.searchParams.set('hash', linkHash);
-            if (ss && ss > 0) u.searchParams.set('ss', Number(ss).toFixed(3));
+            const ssVal = (ss !== undefined && ss !== null) ? Math.floor(ss) : 0;
+            u.searchParams.set('ss', String(ssVal));
             let finalUrl = u.toString();
             if (typeof getEffectiveStreamUrl === 'function') {
                 finalUrl = getEffectiveStreamUrl(finalUrl);
@@ -7206,6 +7199,7 @@
         function destroyAudio() {
             if (!activeAudio) return;
             activeAudio.oncanplay = null;
+            activeAudio.onloadeddata = null;
             activeAudio.onerror = null;
             activeAudio.pause();
             activeAudio.src = '';
@@ -7214,7 +7208,6 @@
             activeAudio = null;
             activeTrackIdx = null;
             audioLoading = false;
-            videoWasPlaying = false;
             window.isSecondaryAudioActive = false;
             window.secondaryAudio = null;
         }
@@ -7222,17 +7215,13 @@
         function reloadAudio(videoTime) {
             if (activeTrackIdx === null || !activeAudio) return;
             audioLoading = true;
+            silenceVideo();
             showSpinner();
             centerIcon.classList.remove('on', 'sticky');
-
-            // Pause video silently if currently playing so it doesn't drift while fetching/transcoding
-            if (!video.paused) {
-                videoWasPlaying = true;
-                video.pause();
-            }
             setPlayIcon();
 
             activeAudio.oncanplay = null;
+            activeAudio.onloadeddata = null;
             activeAudio.onerror = null;
             activeAudio.pause();
 
@@ -7245,31 +7234,35 @@
             activeAudio.load();
 
             activeAudio.onerror = () => {
-                console.error('[AudioTrack] stream error:', activeAudio.error);
+                console.warn('[AudioTrack] Secondary audio stream error, falling back to native stream audio');
                 audioLoading = false;
                 hideSpinner(true);
                 setPlayIcon();
+                restoreVideoAudio();
             };
 
-            activeAudio.oncanplay = () => {
+            const onAudioReady = () => {
                 if (activeTrackIdx === null || !activeAudio) return;
                 audioLoading = false;
                 hideSpinner(true);
-                startVideoTime = video.currentTime;
+                silenceVideo();
 
-                if (videoWasPlaying) {
-                    videoWasPlaying = false;
-                    const p1 = activeAudio.play().catch(e => console.warn('[Audio] play error:', e.message));
-                    const p2 = video.play().catch(e => console.warn('[Video] play error:', e.message));
-                    Promise.allSettled([p1, p2]).then(() => {
-                        setPlayIcon();
-                    });
+                // Compute exact offset in seconds since audio was requested from startVideoTime
+                const offset = (video.currentTime || 0) - startVideoTime;
+                if (offset >= 0 && isFinite(activeAudio.duration) && offset < activeAudio.duration) {
+                    try { activeAudio.currentTime = offset; } catch (e) { }
+                }
+
+                if (!video.paused && !video.ended) {
+                    activeAudio.play().catch(e => console.warn('[Audio] play error:', e.message));
                 } else {
                     activeAudio.pause();
-                    setPlayIcon();
-                    if (video.paused) showCenter(D_PLAY, true);
                 }
+                setPlayIcon();
             };
+
+            activeAudio.oncanplay = onAudioReady;
+            activeAudio.onloadeddata = onAudioReady;
         }
 
         function switchToTrack(streamIndex) {
@@ -7286,15 +7279,13 @@
             window.secondaryAudio = activeAudio;
             window.isSecondaryAudioActive = true;
 
-            videoWasPlaying = !video.paused;
             reloadAudio(video.currentTime || 0);
         }
 
         function switchToDefault() {
-            const resume = videoWasPlaying;
             destroyAudio();
             restoreVideoAudio();
-            if (resume && video.paused) {
+            if (!video.paused) {
                 video.play().catch(() => { });
             }
         }
@@ -7400,31 +7391,14 @@
         function refreshSubtitleForSeek() {
             const idx = activeSubtitleStreamIdx;
             if (idx === null || activeBitmapSubIdx !== null) return;
-            const t = isFinite(video.currentTime) ? video.currentTime : 0;
-            const cues = parsedSubtitleCues[idx] || [];
-            if (cues.length > 0) {
-                const hasNearbyCue = cues.some(c => (t >= c.s - 2 && t <= c.e + 2) || (c.s >= t && c.s <= t + 15));
-                if (hasNearbyCue) {
-                    paintCue();
-                    return;
-                }
-                const minS = cues[0].s;
-                const maxE = cues[cues.length - 1].e;
-                if (t >= minS && t <= maxE) {
-                    paintCue();
-                    return;
-                }
-            }
-            if (subtitleWindowStart[idx] !== undefined && t >= subtitleWindowStart[idx] && subtitleStreamingActive[idx]) {
+            const cues = parsedSubtitleCues[idx];
+            if (cues && cues.length > 0) {
                 paintCue();
                 return;
             }
-            clearTimeout(subSeekDebounce);
-            subSeekDebounce = setTimeout(() => {
-                const ssStart = currentSubtitleSeekStart();
-                subtitleWindowStart[idx] = ssStart;
-                fetchSubtitleStream(idx, buildSubtitleUrl(idx, ssStart));
-            }, 350);
+            if (!subtitleStreamingActive[idx]) {
+                fetchSubtitleStream(idx, buildSubtitleUrl(idx, 0));
+            }
         }
 
         function unescapeHTML(str) {
@@ -7525,8 +7499,6 @@
                 const c = cues[i];
                 if (t >= c.s && t <= c.e) {
                     activeCues.push(c.t);
-                } else if (c.s > t + 2) {
-                    break;
                 }
             }
 
@@ -7655,17 +7627,13 @@
             activeBitmapSubIdx = null;
             getSubtitleOverlay();
             if (subTimer) clearInterval(subTimer);
-            subTimer = setInterval(paintCue, 100);
+            subTimer = setInterval(paintCue, 60);
 
             const existing = parsedSubtitleCues[subIndex];
             if (existing && existing.length > 0) {
                 paintCue();
-            }
-
-            if (!subtitleWindowStart[subIndex] && (!existing || existing.length === 0)) {
-                const ssStart = (video.currentTime && video.currentTime > 10) ? Math.max(0, Math.floor(video.currentTime) - 5) : 0;
-                subtitleWindowStart[subIndex] = ssStart;
-                fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, ssStart));
+            } else if (!subtitleStreamingActive[subIndex]) {
+                fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, 0));
             }
 
             renderSubTrackUI(backendSubTracks, subIndex);
@@ -7865,7 +7833,6 @@
                     if (backendSubTracks.length > 0) {
                         const defaultSub = backendSubTracks.find(s => !s.isBitmap && (s.lang.toLowerCase().includes('eng') || s.subIndex === 0)) || backendSubTracks[0];
                         if (defaultSub && !defaultSub.isBitmap && !parsedSubtitleCues[defaultSub.index]) {
-                            subtitleWindowStart[defaultSub.index] = 0;
                             fetchSubtitleStream(defaultSub.index, buildSubtitleUrl(defaultSub.index, 0));
                         }
                     }
@@ -7916,10 +7883,7 @@
                 backendAudioCtx.resume().catch(() => { });
             }
             if (activeTrackIdx === null || !activeAudio) return;
-            if (audioLoading) {
-                videoWasPlaying = true;
-                video.pause();
-            } else {
+            if (!audioLoading) {
                 activeAudio.play().catch(() => { });
             }
         });
@@ -7944,13 +7908,10 @@
         video.addEventListener('seeking', () => {
             paintCue();
             if (activeTrackIdx === null || !activeAudio) return;
-            if (!video.paused) {
-                videoWasPlaying = true;
-            }
             audioLoading = true;
+            silenceVideo();
             showSpinner();
             centerIcon.classList.remove('on', 'sticky');
-            setPlayIcon();
 
             clearTimeout(seekDebounce);
             seekDebounce = setTimeout(() => {
@@ -7958,7 +7919,7 @@
                 if (activeTrackIdx !== null) {
                     reloadAudio(videoTime);
                 }
-            }, 300);
+            }, 250);
         });
 
         video.addEventListener('waiting', () => {
@@ -7967,13 +7928,10 @@
 
         video.addEventListener('playing', () => {
             if (activeTrackIdx === null || !activeAudio) return;
-            if (audioLoading) {
-                video.pause();
-                videoWasPlaying = true;
-            } else {
-                const drift = video.currentTime - (startVideoTime + activeAudio.currentTime);
-                if (Math.abs(drift) > 2.0) {
-                    console.log('[AudioTrack] Sync drift detected (' + drift.toFixed(2) + 's). Reloading...');
+            if (!audioLoading) {
+                const drift = (video.currentTime || 0) - (startVideoTime + (activeAudio.currentTime || 0));
+                if (Math.abs(drift) > 2.5) {
+                    console.log('[AudioTrack] Sync drift detected (' + drift.toFixed(2) + 's). Re-syncing...');
                     reloadAudio(video.currentTime);
                 } else {
                     activeAudio.play().catch(() => { });
