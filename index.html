@@ -997,6 +997,172 @@
             padding: 10px 4px;
         }
 
+        /* ============ SUBTITLE TRACK SELECTOR POPUP (VisionOS Liquid Glass) ============ */
+        #subTrackWrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        #subTrackBtn {
+            position: relative;
+        }
+
+        #subTrackBtn.sub-active::after {
+            content: '';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 7px;
+            height: 7px;
+            background: #00f2fe;
+            border-radius: 50%;
+            box-shadow: 0 0 8px #00f2fe;
+            pointer-events: none;
+        }
+
+        #subTrackPop {
+            position: absolute;
+            bottom: 56px;
+            right: -24px;
+            transform: translateY(8px) scale(0.92);
+            transform-origin: bottom right;
+            background: rgba(18, 18, 26, 0.90);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            padding: 12px 14px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
+            display: none !important;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 60;
+            width: 250px;
+            max-height: 280px;
+            overflow-y: auto;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #subTrackWrap.open #subTrackPop {
+            display: flex !important;
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .st-track-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .st-track-pill {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e2e8f0;
+            border-radius: 12px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 12px;
+            cursor: pointer;
+            text-align: left;
+            transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .st-track-pill:hover {
+            background: rgba(255, 255, 255, 0.18);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: #fff;
+            transform: scale(1.01);
+        }
+
+        .st-track-pill:active {
+            transform: scale(0.97);
+        }
+
+        .st-track-pill.active {
+            background: rgba(0, 180, 216, 0.95);
+            border-color: #00f2fe;
+            color: #fff;
+            font-weight: 600;
+            box-shadow: 0 2px 10px rgba(0, 180, 216, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+        }
+
+        .st-pill-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .st-pill-name {
+            font-size: 12.5px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .st-pill-meta {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .st-track-pill.active .st-pill-meta {
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .st-pill-check {
+            font-size: 13px;
+            font-weight: 700;
+            opacity: 0;
+            margin-left: 6px;
+            flex-shrink: 0;
+        }
+
+        .st-track-pill.active .st-pill-check {
+            opacity: 1;
+        }
+
+        .st-empty-note {
+            font-size: 11.5px;
+            color: rgba(255, 255, 255, 0.55);
+            text-align: center;
+            padding: 10px 4px;
+        }
+
+        /* VisionOS Subtitle Cue Styling */
+        video::cue {
+            background-color: rgba(0, 0, 0, 0.75);
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            font-size: 1.15rem;
+            font-weight: 500;
+            line-height: 1.4;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            border-radius: 6px;
+            padding: 2px 6px;
+        }
+
         /* ============ DOLBY AUDIO FALLBACK NOTIFICATION TOAST ============ */
         .dolby-prompt {
             position: absolute;
@@ -1423,6 +1589,12 @@
                 padding: 4px 6px;
             }
 
+            #subTrackWrap,
+            #subTrackBtn {
+                order: 5.6;
+                padding: 4px 6px;
+            }
+
             #aspectWrap,
             #aspectBtn {
                 order: 6;
@@ -1538,6 +1710,12 @@
             padding: 4px 6px;
         }
 
+        #stage.layout-mobile #subTrackWrap,
+        #stage.layout-mobile #subTrackBtn {
+            order: 5.6;
+            padding: 4px 6px;
+        }
+
         #stage.layout-mobile #aspectWrap,
         #stage.layout-mobile #aspectBtn {
             order: 6;
@@ -1608,6 +1786,11 @@
 
         #stage.layout-tablet #audioTrackWrap,
         #stage.layout-tablet #audioTrackBtn {
+            order: unset;
+        }
+
+        #stage.layout-tablet #subTrackWrap,
+        #stage.layout-tablet #subTrackBtn {
             order: unset;
         }
 
@@ -1690,6 +1873,12 @@
 
         #stage.layout-desktop #audioTrackWrap,
         #stage.layout-desktop #audioTrackBtn {
+            order: unset;
+            padding: 6px;
+        }
+
+        #stage.layout-desktop #subTrackWrap,
+        #stage.layout-desktop #subTrackBtn {
             order: unset;
             padding: 6px;
         }
@@ -3477,6 +3666,7 @@
 
     <div id="stage">
         <video id="video" crossorigin="anonymous" playsinline preload="auto"></video>
+        <audio id="secondaryAudio" crossorigin="anonymous" preload="auto" style="display:none;"></audio>
         <script>
             /* Instant Media Buffer Starter: Attach stream and trigger browser media pipeline before parsing rest of page */
             (function () {
@@ -3791,6 +3981,28 @@
                     </div>
                     <div class="at-track-list" id="audioTrackList">
                         <div class="at-empty-note">Scanning audio tracks…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5.6 Subtitle Track Selector (CC) with VisionOS Glass Quick Picker -->
+            <div id="subTrackWrap">
+                <button class="ctl-btn" id="subTrackBtn" aria-label="Subtitles" title="Subtitles (C)">
+                    <svg viewBox="0 0 24 24">
+                        <path
+                            d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z" />
+                    </svg>
+                </button>
+                <div id="subTrackPop">
+                    <div class="ap-header">
+                        <svg viewBox="0 0 24 24">
+                            <path
+                                d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z" />
+                        </svg>
+                        <span>Subtitles</span>
+                    </div>
+                    <div class="st-track-list" id="subTrackList">
+                        <div class="st-empty-note">Scanning subtitles…</div>
                     </div>
                 </div>
             </div>
@@ -4274,6 +4486,8 @@
         const volEdge = $('volEdge'), volEdgeFill = $('volEdgeFill'), volEdgePct = $('volEdgePct');
         const briEdge = $('briEdge'), briEdgeFill = $('briEdgeFill'), briEdgePct = $('briEdgePct');
         const seekFxL = $('seekFxL'), seekFxR = $('seekFxR');
+        const secondaryAudio = $('secondaryAudio');
+        const subTrackWrap = $('subTrackWrap'), subTrackBtn = $('subTrackBtn'), subTrackList = $('subTrackList');
 
         /* ================= APPLE SPOKE LOADER ================= */
         const APPLE_SPOKES_HTML = `<div class="spinner-spokes" role="status" aria-label="Loading">
@@ -4748,6 +4962,9 @@
                 return;
             }
 
+            if (typeof resetBackendSync === 'function') {
+                resetBackendSync();
+            }
             if (window.clientAudioEngine) {
                 clientAudioEngine.reset();
             }
@@ -4787,10 +5004,17 @@
             fetchTitleFast(streamUrl);
 
             // 3. Fallback tracks right away so audio badges are non-empty
-            setupFallbackTracks();
+            if (!backendIntegrationActive) {
+                setupFallbackTracks();
+            }
 
             // 4. Update download and copy links
             updateExternalLinks(streamUrl);
+
+            // 4.5 Query backend track specifications immediately
+            if (typeof fetchBackendTracks === 'function') {
+                fetchBackendTracks(streamUrl);
+            }
 
             // 5. Connect stream to video element and trigger explicit resource loading
             const effectiveSrc = getEffectiveStreamUrl(streamUrl);
@@ -5408,7 +5632,11 @@
             if (pct > 0) lastVol = pct;
             isAudioMuted = (pct === 0);
 
-            if (window.clientAudioEngine && clientAudioEngine.active) {
+            if (window.isSecondaryAudioActive && window.secondaryAudio) {
+                video.muted = true;
+                secondaryAudio.volume = pct / 100;
+                secondaryAudio.muted = (pct === 0);
+            } else if (window.clientAudioEngine && clientAudioEngine.active) {
                 video.muted = true; // Silence native video so silent track doesn't conflict
                 clientAudioEngine.setVolume(pct / 100, pct === 0);
             } else {
@@ -5463,6 +5691,8 @@
             if (aspectWrap && !aspectWrap.contains(e.target)) aspectWrap.classList.remove('open');
             const aWrap = $('audioTrackWrap');
             if (aWrap && !aWrap.contains(e.target)) aWrap.classList.remove('open');
+            const sWrap = $('subTrackWrap');
+            if (sWrap && !sWrap.contains(e.target)) sWrap.classList.remove('open');
         });
 
         let isBooting = true;
@@ -5811,6 +6041,9 @@
             if (!aspectWrap) return;
             const isOpen = aspectWrap.classList.contains('open');
             const next = typeof force === 'boolean' ? force : !isOpen;
+            if (next && volWrap) volWrap.classList.remove('open');
+            if (next && audioTrackWrap) audioTrackWrap.classList.remove('open');
+            if (next && subTrackWrap) subTrackWrap.classList.remove('open');
             aspectWrap.classList.toggle('open', next);
             if (next) wakeUI(5000);
         }
@@ -5848,6 +6081,31 @@
             });
         });
 
+        /* ================= SUBTITLE TRACK SELECTOR POPUP ================= */
+        function toggleSubTrackPop(force) {
+            if (!subTrackWrap) return;
+            const isOpen = subTrackWrap.classList.contains('open');
+            const next = typeof force === 'boolean' ? force : !isOpen;
+            if (next && aspectWrap) aspectWrap.classList.remove('open');
+            if (next && volWrap) volWrap.classList.remove('open');
+            if (next && audioTrackWrap) audioTrackWrap.classList.remove('open');
+            subTrackWrap.classList.toggle('open', next);
+            if (next) wakeUI(5000);
+        }
+
+        if (subTrackBtn) {
+            const onSubTrackTrigger = e => {
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable && e.type === 'touchend') e.preventDefault();
+                }
+                toggleSubTrackPop();
+                wakeUI(5000);
+            };
+            subTrackBtn.addEventListener('click', onSubTrackTrigger);
+            subTrackBtn.addEventListener('touchend', onSubTrackTrigger, { passive: false });
+        }
+
         /* ================= AUDIO TRACK SELECTOR & CLIENT-SIDE DOLBY ENGINE ================= */
         const audioTrackWrap = $('audioTrackWrap');
         const audioTrackBtn = $('audioTrackBtn');
@@ -5859,6 +6117,7 @@
             const next = typeof force === 'boolean' ? force : !isOpen;
             if (next && aspectWrap) aspectWrap.classList.remove('open');
             if (next && volWrap) volWrap.classList.remove('open');
+            if (next && subTrackWrap) subTrackWrap.classList.remove('open');
             audioTrackWrap.classList.toggle('open', next);
             if (next) wakeUI(5000);
         }
@@ -5918,7 +6177,9 @@
                     if (e.cancelable && e.type === 'touchend') e.preventDefault();
                 }
                 const idx = parseInt(btn.dataset.trackIndex, 10);
-                if (window.clientAudioEngine) {
+                if (window.backendIntegrationActive) {
+                    selectBackendAudioTrack(idx);
+                } else if (window.clientAudioEngine) {
                     clientAudioEngine.selectTrack(idx);
                 }
                 toggleAudioTrackPop(false);
@@ -5938,7 +6199,9 @@
                     btn.addEventListener('click', e => {
                         e.stopPropagation();
                         const idx = parseInt(btn.dataset.trackIndex, 10);
-                        if (window.clientAudioEngine) {
+                        if (window.backendIntegrationActive) {
+                            selectBackendAudioTrack(idx);
+                        } else if (window.clientAudioEngine) {
                             clientAudioEngine.selectTrack(idx);
                         }
                     });
@@ -6581,6 +6844,568 @@
             }
         });
 
+        /* ================= BACKEND MULTI-TRACK AUDIO & WEBVTT SUBTITLE ENGINE ================= */
+        const ISO_LANG_MAP = {
+            eng: 'English', en: 'English',
+            tam: 'Tamil', ta: 'Tamil',
+            tel: 'Telugu', te: 'Telugu',
+            hin: 'Hindi', hi: 'Hindi',
+            mal: 'Malayalam', ml: 'Malayalam',
+            kan: 'Kannada', kn: 'Kannada',
+            spa: 'Spanish', es: 'Spanish',
+            fre: 'French', fra: 'French', fr: 'French',
+            ger: 'German', deu: 'German', de: 'German',
+            ita: 'Italian', it: 'Italian',
+            jpn: 'Japanese', ja: 'Japanese',
+            kor: 'Korean', ko: 'Korean',
+            chi: 'Chinese', zho: 'Chinese', zh: 'Chinese',
+            rus: 'Russian', ru: 'Russian',
+            ara: 'Arabic', ar: 'Arabic',
+            por: 'Portuguese', pt: 'Portuguese',
+            und: 'Undetermined'
+        };
+
+        function formatLanguage(langCode, title) {
+            if (title && String(title).trim()) return String(title).trim();
+            if (!langCode) return 'Unknown';
+            const code = String(langCode).toLowerCase().trim();
+            return ISO_LANG_MAP[code] || String(langCode).toUpperCase();
+        }
+
+        function formatCodecName(codec) {
+            if (!codec) return '';
+            const c = String(codec).toLowerCase().trim();
+            if (c === 'eac3' || c === 'e-ac-3' || c === 'ec-3') return 'E-AC-3';
+            if (c === 'ac3' || c === 'ac-3') return 'AC-3';
+            if (c === 'dts' || c === 'dca') return 'DTS';
+            if (c === 'truehd' || c === 'mlp') return 'TrueHD';
+            if (c === 'aac') return 'AAC';
+            if (c === 'opus') return 'Opus';
+            if (c === 'mp3') return 'MP3';
+            if (c === 'flac') return 'FLAC';
+            if (c === 'subrip' || c === 'srt') return 'SRT';
+            if (c === 'ass' || c === 'ssa') return 'ASS';
+            if (c === 'webvtt' || c === 'vtt') return 'WebVTT';
+            if (c === 'hdmv_pgs_subtitle' || c === 'pgs') return 'PGS';
+            if (c === 'vobsub' || c === 'dvd_subtitle') return 'VobSub';
+            return String(codec).toUpperCase();
+        }
+
+        function formatChannels(channels) {
+            if (!channels) return '';
+            const ch = parseInt(channels, 10);
+            if (ch === 6) return '5.1';
+            if (ch === 8) return '7.1';
+            if (ch === 2) return 'Stereo';
+            if (ch === 1) return 'Mono';
+            return `${ch} ch`;
+        }
+
+        let backendInfo = null;
+        let backendAudioTracks = [];
+        let backendSubTracks = [];
+        let activeBackendAudioIndex = 0;
+        let activeBackendSubIndex = -1; // -1 means Off
+        let isSecondaryAudioActive = false;
+        window.isSecondaryAudioActive = false;
+        let audioBaseTime = 0;
+        let isSyncingAudio = false;
+        let audioSyncToken = 0;
+        let backendIntegrationActive = false;
+        window.backendIntegrationActive = false;
+
+        function parseBackendInfo(rawUrl) {
+            if (!rawUrl) return null;
+            let target = String(rawUrl).trim();
+            // Unwrap target URL if already routed through /api/proxy
+            if (target.includes('/api/proxy?url=')) {
+                try {
+                    const m = target.match(/[?&]url=([^&]+)/);
+                    if (m && m[1]) target = decodeURIComponent(m[1]);
+                } catch (e) { }
+            }
+            try {
+                const u = new URL(target, window.location.href);
+                const origin = u.origin;
+                const hash = u.searchParams.get('hash') || '';
+                let id = u.searchParams.get('id') || '';
+                if (!id) {
+                    const parts = u.pathname.split('/').filter(Boolean);
+                    if (parts.length > 0) {
+                        id = parts[parts.length - 1];
+                    }
+                }
+                if (id) {
+                    return {
+                        origin,
+                        id,
+                        hash,
+                        buildUrl(endpoint) {
+                            return `${origin}${endpoint}`;
+                        }
+                    };
+                }
+            } catch (e) {
+                console.warn('[Backend] parseBackendInfo failed:', e);
+            }
+            return null;
+        }
+
+        function isBrowserSupportedAudio(codec, channels) {
+            if (!codec) return false;
+            const c = String(codec).toLowerCase().trim();
+            // Unsupported Dolby / DTS / HD audio in standard HTML5 video tag:
+            if (/^(ac-?3|e-?ac-?3|ec-?3|dd\+|dts|truehd|mlp)/i.test(c)) return false;
+            // Native browser supported codecs:
+            if (/^(aac|mp3|opus|vorbis|flac)/i.test(c)) {
+                if (channels && channels > 2) return false;
+                return true;
+            }
+            return false;
+        }
+
+        function showSubToast(msg) {
+            if (typeof updateCapsuleHud === 'function') {
+                const subIcon = 'M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 7H9.5v-.5h-2v3h2V13H11v1c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1zm7 0h-1.5v-.5h-2v3h2V13H18v1c0 .55-.45 1-1 1h-3c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1h3c.55 0 1 .45 1 1v1z';
+                updateCapsuleHud(subIcon, 100, msg);
+            }
+        }
+
+        function renderSubTrackUI(tracks, activeIndex) {
+            if (!subTrackList) return;
+            if (!tracks || tracks.length === 0) {
+                subTrackList.innerHTML = '<div class="st-empty-note">No subtitles available</div>';
+                return;
+            }
+
+            let html = `
+                <button class="st-track-pill ${activeIndex === -1 ? 'active' : ''}" data-sub-index="-1">
+                    <div class="st-pill-info">
+                        <span class="st-pill-name">Off</span>
+                        <span class="st-pill-meta">Subtitles hidden</span>
+                    </div>
+                    <span class="st-pill-check">✓</span>
+                </button>
+            `;
+
+            tracks.forEach((t) => {
+                const isActive = t.subIndex === activeIndex;
+                const lang = t.lang || t.title || `Track ${t.subIndex + 1}`;
+                const codec = t.codec || 'SRT';
+                const extra = [codec, t.isBitmap ? 'Bitmap' : 'Text'].filter(Boolean).join(' • ');
+
+                html += `
+                    <button class="st-track-pill ${isActive ? 'active' : ''}" data-sub-index="${t.subIndex}">
+                        <div class="st-pill-info">
+                            <span class="st-pill-name">${escapeHtml(lang)}</span>
+                            <span class="st-pill-meta">${escapeHtml(extra)}</span>
+                        </div>
+                        <span class="st-pill-check">✓</span>
+                    </button>
+                `;
+            });
+
+            subTrackList.innerHTML = html;
+
+            const onPillSelect = e => {
+                const btn = e.target.closest('.st-track-pill');
+                if (!btn) return;
+                if (e) {
+                    e.stopPropagation();
+                    if (e.cancelable && e.type === 'touchend') e.preventDefault();
+                }
+                const idx = parseInt(btn.dataset.subIndex, 10);
+                selectSubtitleTrack(idx);
+                toggleSubTrackPop(false);
+                wakeUI(3500);
+            };
+
+            subTrackList.querySelectorAll('.st-track-pill').forEach(btn => {
+                btn.addEventListener('click', onPillSelect);
+                btn.addEventListener('touchend', onPillSelect, { passive: false });
+            });
+        }
+
+        function selectSubtitleTrack(subIndex) {
+            if (subIndex === -1) {
+                // Turn subtitles off
+                video.querySelectorAll('track').forEach(t => t.remove());
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    video.textTracks[i].mode = 'disabled';
+                }
+                activeBackendSubIndex = -1;
+                renderSubTrackUI(backendSubTracks, -1);
+                if (subTrackBtn) subTrackBtn.classList.remove('sub-active');
+                showSubToast('Subtitles: Off');
+                return;
+            }
+
+            const track = backendSubTracks.find(t => t.subIndex === subIndex);
+            if (!track) return;
+
+            if (track.isBitmap) {
+                showSubToast('Bitmap subtitles only supported in VLC/external player');
+                return;
+            }
+
+            // Remove existing tracks
+            video.querySelectorAll('track').forEach(t => t.remove());
+
+            const trackEl = document.createElement('track');
+            trackEl.kind = 'subtitles';
+            const lang = track.tagsLang || track.lang || 'en';
+            const label = track.title || track.lang || `Track ${track.subIndex + 1}`;
+            trackEl.label = label;
+            trackEl.srclang = lang;
+            trackEl.default = true;
+
+            const subUrl = backendInfo.buildUrl(`/subs/${track.subIndex}/${backendInfo.id}?hash=${backendInfo.hash}&ss=0`);
+            trackEl.src = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(subUrl) : subUrl;
+
+            video.appendChild(trackEl);
+
+            const activate = () => {
+                for (let i = 0; i < video.textTracks.length; i++) {
+                    const tt = video.textTracks[i];
+                    if (tt.label === label || tt.language === lang || i === video.textTracks.length - 1) {
+                        tt.mode = 'showing';
+                    } else {
+                        tt.mode = 'disabled';
+                    }
+                }
+            };
+            trackEl.addEventListener('load', activate);
+            setTimeout(activate, 50);
+            setTimeout(activate, 250);
+
+            activeBackendSubIndex = subIndex;
+            renderSubTrackUI(backendSubTracks, subIndex);
+            if (subTrackBtn) subTrackBtn.classList.add('sub-active');
+            showSubToast(`Subtitles: ${label}`);
+        }
+
+        function cycleSubtitleTrack() {
+            if (!backendSubTracks || backendSubTracks.length === 0) {
+                showSubToast('No subtitles available');
+                return;
+            }
+            const textSubs = backendSubTracks.filter(t => !t.isBitmap);
+            if (textSubs.length === 0) {
+                showSubToast('Bitmap subtitles only supported in VLC/external player');
+                return;
+            }
+            if (activeBackendSubIndex === -1) {
+                selectSubtitleTrack(textSubs[0].subIndex);
+            } else {
+                const curPos = textSubs.findIndex(t => t.subIndex === activeBackendSubIndex);
+                if (curPos >= 0 && curPos < textSubs.length - 1) {
+                    selectSubtitleTrack(textSubs[curPos + 1].subIndex);
+                } else {
+                    selectSubtitleTrack(-1); // Toggle off
+                }
+            }
+        }
+
+        async function syncAudioSeek(ss, targetAudioIdx = activeBackendAudioIndex, autoResume = !video.paused) {
+            if (!backendInfo || !secondaryAudio || targetAudioIdx < 0) return;
+            const currentToken = ++audioSyncToken;
+            isSyncingAudio = true;
+            audioBaseTime = ss;
+
+            // Pause video and show buffering spinner during TTFB buffer delay
+            video.pause();
+            showSpinner();
+
+            const audioEndpoint = `/audio/${targetAudioIdx}/${backendInfo.id}?hash=${backendInfo.hash}&ss=${ss}`;
+            const fullAudioUrl = backendInfo.buildUrl(audioEndpoint);
+            const effectiveAudioUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(fullAudioUrl) : fullAudioUrl;
+
+            secondaryAudio.src = effectiveAudioUrl;
+            secondaryAudio.load();
+            secondaryAudio.playbackRate = video.playbackRate || 1;
+            secondaryAudio.volume = (typeof lastVol === 'number' ? lastVol : 100) / 100;
+            secondaryAudio.muted = (isAudioMuted || lastVol === 0);
+
+            const waitAudio = new Promise(resolve => {
+                if (secondaryAudio.readyState >= 3) return resolve();
+                const onReady = () => {
+                    secondaryAudio.removeEventListener('canplay', onReady);
+                    secondaryAudio.removeEventListener('error', onErr);
+                    resolve();
+                };
+                const onErr = () => {
+                    secondaryAudio.removeEventListener('canplay', onReady);
+                    secondaryAudio.removeEventListener('error', onErr);
+                    resolve();
+                };
+                secondaryAudio.addEventListener('canplay', onReady, { once: true });
+                secondaryAudio.addEventListener('error', onErr, { once: true });
+                setTimeout(resolve, 7000);
+            });
+
+            const waitVideo = new Promise(resolve => {
+                if (video.readyState >= 3) return resolve();
+                const onReady = () => {
+                    video.removeEventListener('canplay', onReady);
+                    resolve();
+                };
+                video.addEventListener('canplay', onReady, { once: true });
+                setTimeout(resolve, 7000);
+            });
+
+            await Promise.all([waitAudio, waitVideo]);
+
+            if (currentToken !== audioSyncToken) return; // Superseded by newer seek
+
+            isSyncingAudio = false;
+            hideSpinner(true);
+
+            if (autoResume) {
+                try {
+                    await Promise.all([
+                        video.play().catch(e => console.warn('video play blocked:', e)),
+                        secondaryAudio.play().catch(e => console.warn('audio play blocked:', e))
+                    ]);
+                } catch (e) { }
+            }
+        }
+
+        function checkDrift() {
+            if (!isSecondaryAudioActive || isSyncingAudio || !secondaryAudio || video.paused || video.seeking) return;
+            if (secondaryAudio.readyState < 2) return;
+
+            const currentAudioTime = audioBaseTime + secondaryAudio.currentTime;
+            const drift = (video.currentTime || 0) - currentAudioTime;
+            const absDrift = Math.abs(drift);
+            const baseRate = video.playbackRate || 1;
+
+            if (absDrift > 2.0) {
+                console.log(`[DriftLock] Large drift detected (${drift.toFixed(2)}s). Resyncing audio.`);
+                syncAudioSeek(Math.floor(video.currentTime || 0), activeBackendAudioIndex, true);
+            } else if (absDrift > 0.25) {
+                // Adjust audio playbackRate slightly to pull into lock
+                const nudgeFactor = drift > 0 ? 1.05 : 0.95;
+                secondaryAudio.playbackRate = baseRate * nudgeFactor;
+            } else if (absDrift <= 0.08 && secondaryAudio.playbackRate !== baseRate) {
+                // Fully aligned: restore standard rate
+                secondaryAudio.playbackRate = baseRate;
+            }
+        }
+
+        // 250ms interval continuous drift monitor
+        setInterval(checkDrift, 250);
+
+        async function selectBackendAudioTrack(index) {
+            if (!backendAudioTracks || index < 0 || index >= backendAudioTracks.length) return;
+            activeBackendAudioIndex = index;
+            mediaFileInfo.activeAudioIndex = index;
+            const track = backendAudioTracks[index];
+
+            renderAudioTrackUI(backendAudioTracks, index);
+
+            // If Track 0 and browser supported native AAC/MP3:
+            if (index === 0 && track.isBrowserSupported) {
+                isSecondaryAudioActive = false;
+                window.isSecondaryAudioActive = false;
+                if (secondaryAudio) {
+                    secondaryAudio.pause();
+                    secondaryAudio.removeAttribute('src');
+                    secondaryAudio.load();
+                }
+                if (window.clientAudioEngine && clientAudioEngine.active) {
+                    clientAudioEngine.deactivate();
+                }
+                video.muted = (isAudioMuted || lastVol === 0);
+                video.volume = (lastVol || 100) / 100;
+                const btn = $('audioTrackBtn');
+                if (btn) btn.classList.remove('dolby-active');
+                showAudioToast(`${track.lang} [Native ${track.codec}]`);
+                return;
+            }
+
+            // Secondary audio or unsupported codec: route through secondary <audio>
+            isSecondaryAudioActive = true;
+            window.isSecondaryAudioActive = true;
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                clientAudioEngine.deactivate();
+            }
+            video.muted = true; // Silence native video
+
+            const btn = $('audioTrackBtn');
+            if (btn) btn.classList.add('dolby-active');
+
+            const label = `${track.lang} [${track.codec} ${track.channels}]`;
+            showAudioToast(label);
+
+            const seekSec = Math.floor(video.currentTime || 0);
+            await syncAudioSeek(seekSec, index, !video.paused);
+        }
+
+        async function fetchBackendTracks(url) {
+            backendInfo = parseBackendInfo(url);
+            if (!backendInfo) return null;
+
+            const apiUrl = backendInfo.buildUrl(`/api/tracks/${backendInfo.id}?hash=${backendInfo.hash}`);
+            const effectiveApiUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(apiUrl) : apiUrl;
+
+            try {
+                const res = await fetch(effectiveApiUrl, {
+                    headers: { 'Accept': 'application/json' },
+                    signal: AbortSignal.timeout ? AbortSignal.timeout(5000) : undefined
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (Array.isArray(data) && data.length > 0) {
+                    console.log('[Backend] Successfully loaded track specifications:', data);
+                    backendIntegrationActive = true;
+                    window.backendIntegrationActive = true;
+
+                    // Filter AUDIO streams (strictly 0-based audioIndex)
+                    const rawAudio = data.filter(t => t.codec_type === 'audio');
+                    backendAudioTracks = rawAudio.map((t, idx) => {
+                        const codec = t.codec_name || '';
+                        const channels = t.channels || 2;
+                        const langCode = t.tags?.language || t.tags?.lang || '';
+                        const rawTitle = t.tags?.title || '';
+                        const langName = formatLanguage(langCode, rawTitle);
+                        const isSupported = isBrowserSupportedAudio(codec, channels);
+                        return {
+                            index: t.index,
+                            audioIndex: idx, // 0-based among audio
+                            codec: formatCodecName(codec),
+                            rawCodec: codec,
+                            channels: formatChannels(channels),
+                            rawChannels: channels,
+                            lang: langName,
+                            name: rawTitle || langName,
+                            title: rawTitle,
+                            isBrowserSupported: isSupported,
+                            isDolby: !isSupported
+                        };
+                    });
+
+                    // Filter SUBTITLE streams (strictly 0-based subIndex)
+                    const rawSubs = data.filter(t => t.codec_type === 'subtitle');
+                    backendSubTracks = rawSubs.map((t, idx) => {
+                        const codec = t.codec_name || '';
+                        const langCode = t.tags?.language || t.tags?.lang || '';
+                        const rawTitle = t.tags?.title || '';
+                        const langName = formatLanguage(langCode, rawTitle);
+                        const isBitmap = /^(hdmv_pgs|pgs|vobsub|dvd_sub|dvdsub|xsub|dvb)/i.test(codec);
+                        return {
+                            index: t.index,
+                            subIndex: idx, // 0-based among subtitles
+                            codec: formatCodecName(codec),
+                            rawCodec: codec,
+                            lang: langName,
+                            tagsLang: langCode,
+                            title: rawTitle || langName,
+                            isBitmap
+                        };
+                    });
+
+                    // Update media info display
+                    mediaFileInfo.audioTracks = backendAudioTracks;
+                    mediaFileInfo.subTracks = backendSubTracks;
+                    updateMediaInfoDisplay();
+
+                    // Render UI track selectors
+                    renderAudioTrackUI(backendAudioTracks, 0);
+                    renderSubTrackUI(backendSubTracks, -1);
+
+                    // Auto-select Track 0
+                    if (backendAudioTracks.length > 0) {
+                        const t0 = backendAudioTracks[0];
+                        if (t0.isBrowserSupported) {
+                            console.log('[Backend] Track 0 is browser-supported (' + t0.codec + '), native audio active.');
+                            video.muted = (isAudioMuted || lastVol === 0);
+                            video.volume = (lastVol || 100) / 100;
+                            isSecondaryAudioActive = false;
+                            window.isSecondaryAudioActive = false;
+                        } else {
+                            console.log('[Backend] Track 0 is ' + t0.codec + ', engaging transcoded secondary audio.');
+                            selectBackendAudioTrack(0);
+                        }
+                    }
+
+                    return data;
+                }
+            } catch (err) {
+                console.log('[Backend] /api/tracks not available or failed, using client fallback:', err);
+                backendIntegrationActive = false;
+                window.backendIntegrationActive = false;
+            }
+            return null;
+        }
+
+        function resetBackendSync() {
+            backendInfo = null;
+            backendAudioTracks = [];
+            backendSubTracks = [];
+            activeBackendAudioIndex = 0;
+            activeBackendSubIndex = -1;
+            isSecondaryAudioActive = false;
+            window.isSecondaryAudioActive = false;
+            backendIntegrationActive = false;
+            window.backendIntegrationActive = false;
+            isSyncingAudio = false;
+            audioBaseTime = 0;
+            if (secondaryAudio) {
+                secondaryAudio.pause();
+                secondaryAudio.removeAttribute('src');
+                secondaryAudio.load();
+            }
+            video.querySelectorAll('track').forEach(t => t.remove());
+            const aBtn = $('audioTrackBtn');
+            if (aBtn) aBtn.classList.remove('dolby-active');
+            const sBtn = $('subTrackBtn');
+            if (sBtn) sBtn.classList.remove('sub-active');
+            if (subTrackList) subTrackList.innerHTML = '<div class="st-empty-note">Scanning subtitles…</div>';
+        }
+
+        // Secondary Audio Element Synchronization Listeners
+        video.addEventListener('play', () => {
+            if (isSecondaryAudioActive && secondaryAudio) {
+                secondaryAudio.playbackRate = video.playbackRate || 1;
+                secondaryAudio.play().catch(() => { });
+            }
+        });
+        video.addEventListener('pause', () => {
+            if (isSecondaryAudioActive && secondaryAudio) {
+                secondaryAudio.pause();
+            }
+        });
+        video.addEventListener('ratechange', () => {
+            if (isSecondaryAudioActive && secondaryAudio) {
+                secondaryAudio.playbackRate = video.playbackRate || 1;
+            }
+        });
+        video.addEventListener('seeking', () => {
+            if (isSecondaryAudioActive && secondaryAudio) {
+                secondaryAudio.pause();
+            }
+        });
+        video.addEventListener('seeked', () => {
+            if (isSecondaryAudioActive) {
+                syncAudioSeek(Math.floor(video.currentTime || 0), activeBackendAudioIndex, !video.paused);
+            }
+        });
+        video.addEventListener('waiting', () => {
+            if (isSecondaryAudioActive && secondaryAudio) {
+                secondaryAudio.pause();
+            }
+        });
+        video.addEventListener('playing', () => {
+            if (isSecondaryAudioActive && secondaryAudio && !isSyncingAudio) {
+                secondaryAudio.play().catch(() => { });
+            }
+        });
+        video.addEventListener('timeupdate', () => {
+            if (isSecondaryAudioActive) {
+                checkDrift();
+            }
+        });
+
         /* ================= NATIVE AUDIO SETUP ================= */
         video.muted = false;
         video.volume = 1;
@@ -7094,7 +7919,9 @@
             const subTracks = tracks.filter(t => t.type === 'sub');
 
             if (audioTracks.length === 0) {
+                if (!backendIntegrationActive) {
                 setupFallbackTracks();
+            }
                 return;
             }
 
@@ -7265,6 +8092,11 @@
                         if (!isNaN(bytes) && bytes > 0) mediaFileInfo.fileSize = formatBytes(bytes);
                     }
 
+                    if (backendIntegrationActive) {
+                        updateMediaInfoDisplay();
+                        return;
+                    }
+
                     const xTracks = head.headers.get('X-Audio-Tracks') || head.headers.get('X-Media-Tracks');
                     if (xTracks) {
                         const items = xTracks.split(',').map(s => ({ type: 'audio', name: s.trim(), codec: 'Audio', channels: '' }));
@@ -7351,7 +8183,9 @@
                     console.warn('Metadata inspection target failed:', target, e);
                 }
             }
-            setupFallbackTracks();
+            if (!backendIntegrationActive) {
+                setupFallbackTracks();
+            }
         }
 
         /* ================= VLC MODAL (ported from v1) ================= */
@@ -7464,7 +8298,7 @@
         let holding = false;
 
         function inControls(e) {
-            return e.target.closest('#controls, #volPop, #aspectPop, #aspectWrap, #audioTrackPop, #audioTrackWrap, #dolbyPrompt, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
+            return e.target.closest('#controls, #volPop, #aspectPop, #aspectWrap, #audioTrackPop, #audioTrackWrap, #subTrackPop, #subTrackWrap, #dolbyPrompt, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
         }
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
@@ -7631,6 +8465,8 @@
                         if (aspectWrap) aspectWrap.classList.remove('open');
                         const aWrap = $('audioTrackWrap');
                         if (aWrap) aWrap.classList.remove('open');
+                        const sWrap = $('subTrackWrap');
+                        if (sWrap) sWrap.classList.remove('open');
                         pauseLiquidGlass();
                     }
                 }, duration);
@@ -7920,11 +8756,18 @@
                 return;
             }
             else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.code === 'AudioVolumeMute' || e.key === 'AudioVolumeMute') {
-                const isCurrentlyMuted = isAudioMuted || (window.clientAudioEngine && clientAudioEngine.active ? isAudioMuted : (video.muted || video.volume === 0));
+                const isCurrentlyMuted = isAudioMuted || (window.isSecondaryAudioActive && window.secondaryAudio ? (secondaryAudio.muted || secondaryAudio.volume === 0) : (window.clientAudioEngine && clientAudioEngine.active ? isAudioMuted : (video.muted || video.volume === 0)));
                 const next = isCurrentlyMuted ? (lastVol || 100) : 0;
                 setVolume(next);
                 triggerVolHud(next);
                 return; // Mute toggle ONLY shows volume capsule, does not wake UI
+            }
+            else if (e.code === 'KeyC' || e.key === 'c' || e.key === 'C') {
+                e.preventDefault();
+                if (typeof cycleSubtitleTrack === 'function') {
+                    cycleSubtitleTrack();
+                }
+                return;
             }
             else if (e.code === 'KeyF' || e.key === 'f' || e.key === 'F') {
                 e.preventDefault();
