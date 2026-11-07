@@ -6063,6 +6063,41 @@
             }
         }
 
+        // Range-safe fetch for strict stream workers (bounded, size-clamped, logs 400 bodies)
+        function makeRangeSafeFetch(label) {
+            // Makes every Range request "boring" for strict stream workers:
+            // always bounded (bytes=a-b), capped to 4 MiB, clamped to the file size, never open-ended.
+            const CAP = 4 * 1024 * 1024;
+            const state = { total: 0, lastErr: '' };
+            const fn = async function (input, init) {
+                const url = (typeof input === 'string' || input instanceof URL) ? String(input) : input.url;
+                const headers = new Headers((init && init.headers) || (input instanceof Request ? input.headers : undefined));
+                const m = /^bytes=(\d+)-(\d*)$/.exec(headers.get('Range') || '');
+                if (m) {
+                    const start = +m[1];
+                    let end = m[2] !== '' ? +m[2] : start + CAP - 1;
+                    end = Math.min(end, start + CAP - 1);
+                    if (state.total) {
+                        if (start >= state.total) end = start; // let server answer 416 itself
+                        else end = Math.min(end, state.total - 1);
+                    }
+                    headers.set('Range', 'bytes=' + start + '-' + end);
+                }
+                const res = await fetch(url, { ...(init || {}), headers });
+                const cr = /\/(\d+)\s*$/.exec(res.headers.get('Content-Range') || '');
+                if (cr) state.total = +cr[1];
+                if (!res.ok && res.status !== 206) {
+                    let body = '';
+                    try { body = (await res.clone().text()).slice(0, 200); } catch (_) { }
+                    state.lastErr = 'HTTP ' + res.status + ' Range=' + headers.get('Range') + ' body=' + body;
+                    console.warn('[AudioEngine:' + (label || 'fetch') + '] ' + state.lastErr);
+                }
+                return res;
+            };
+            fn.state = state;
+            return fn;
+        }
+
         // Client-Side Audio Engine
         window.clientAudioEngine = {
             audioCtx: null,
@@ -6174,6 +6209,17 @@
                 await this.activateTrack(index);
             },
 
+            makeUrlSource(mediabunny, url) {
+                return new mediabunny.UrlSource(url, {
+                    fetchFn: makeRangeSafeFetch('audio'),
+                    parallelism: 1,                       // don't open extra connections beside the <video>
+                    maxCacheSize: 32 * 1024 * 1024,
+                    // default is "retry forever"; give up after 4 tries so we can fail over cleanly
+                    getRetryDelay: (attempts) => attempts < 4 ? Math.min(0.5 * Math.pow(2, attempts), 4) : null,
+                    handleUnhandledError: (e) => console.warn('[AudioEngine] source error:', e)
+                });
+            },
+
             async activateTrack(index) {
                 const track = this.audioTracks[index];
                 if (!track) return;
@@ -6201,7 +6247,7 @@
                         let srcUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(streamUrl) : streamUrl;
 
                         try {
-                            const source = new mediabunny.UrlSource(srcUrl);
+                            const source = this.makeUrlSource(mediabunny, srcUrl);
                             this.mediabunnyInput = new mediabunny.Input({
                                 source,
                                 formats: mediabunny.ALL_FORMATS
@@ -6210,7 +6256,7 @@
                         } catch (urlErr) {
                             if (!srcUrl.startsWith('/api/proxy') && !srcUrl.includes('/api/proxy?url=')) {
                                 srcUrl = `/api/proxy?url=${encodeURIComponent(streamUrl)}`;
-                                const source = new mediabunny.UrlSource(srcUrl);
+                                const source = this.makeUrlSource(mediabunny, srcUrl);
                                 this.mediabunnyInput = new mediabunny.Input({
                                     source,
                                     formats: mediabunny.ALL_FORMATS
@@ -6279,11 +6325,25 @@
                             break;
                         }
 
+                        this._decodeRetries = 0;
                         this.scheduleSample(sample);
                     }
                 } catch (iterErr) {
                     if (currentGen === this.decodeGeneration) {
                         console.warn('[AudioEngine] Decode stream error:', iterErr);
+                        this._decodeRetries = (this._decodeRetries || 0) + 1;
+                        if (this._decodeRetries <= 3 && !video.paused) {
+                            // transient server hiccup: restart from the video's current position
+                            setTimeout(() => {
+                                if (this.active && currentGen === this.decodeGeneration && !video.paused) {
+                                    this.stopAllScheduledNodes();
+                                    this.startDecodeLoop(video.currentTime || 0);
+                                }
+                            }, 800 * this._decodeRetries);
+                        } else {
+                            this._decodeRetries = 0;
+                            this.handleFailure(iterErr);
+                        }
                     }
                 }
             },
