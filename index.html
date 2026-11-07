@@ -5523,19 +5523,65 @@
 
         /* ================= SEEK SLIDER ================= */
         /* ================= BUFFER PROGRESS TRACKER ================= */
+        let totalMediaDuration = 0;
+        let streamSeekOffset = 0;
+
+        function getMediaDuration() {
+            if (totalMediaDuration > 30) return totalMediaDuration;
+            if (video.duration && isFinite(video.duration) && video.duration > 30) return video.duration;
+            return (video.duration && isFinite(video.duration)) ? video.duration : 0;
+        }
+
+        function getMediaCurrentTime() {
+            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            return (isTranscoded ? streamSeekOffset : 0) + (video.currentTime || 0);
+        }
+
+        function seekToTime(targetSec) {
+            const dur = getMediaDuration();
+            targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
+            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+
+            if (isTranscoded && typeof buildStreamUrlWithAudio === 'function') {
+                streamSeekOffset = targetSec;
+                const newUrl = buildStreamUrlWithAudio(activeBackendAudioIndex, targetSec);
+
+                showSpinner();
+                video.src = newUrl;
+                video.load();
+
+                const onReady = () => {
+                    video.removeEventListener('loadedmetadata', onReady);
+                    video.removeEventListener('canplay', onReady);
+                    hideSpinner(true);
+                    video.play().catch(() => {});
+                };
+                video.addEventListener('loadedmetadata', onReady, { once: true });
+                video.addEventListener('canplay', onReady, { once: true });
+            } else {
+                streamSeekOffset = 0;
+                try { video.currentTime = targetSec; } catch (e) {}
+            }
+            updateTimeLabel();
+            paintSeek();
+        }
+
         function getBufferedPct() {
-            if (!video.duration || !video.buffered || !video.buffered.length) return 0;
-            const cur = video.currentTime;
+            const dur = getMediaDuration();
+            if (!dur || !video.buffered || !video.buffered.length) return 0;
+            const cur = getMediaCurrentTime();
+            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const offset = isTranscoded ? streamSeekOffset : 0;
             for (let i = 0; i < video.buffered.length; i++) {
-                const start = video.buffered.start(i);
-                const end = video.buffered.end(i);
+                const start = offset + video.buffered.start(i);
+                const end = offset + video.buffered.end(i);
                 if (start <= cur + 1.5 && cur <= end + 1.5) {
-                    return Math.min(100, (end / video.duration) * 100);
+                    return Math.min(100, (end / dur) * 100);
                 }
             }
             try {
-                const lastEnd = video.buffered.end(video.buffered.length - 1);
-                return Math.min(100, (lastEnd / video.duration) * 100);
+                const lastEnd = offset + video.buffered.end(video.buffered.length - 1);
+                return Math.min(100, (lastEnd / dur) * 100);
             } catch (e) {
                 return 0;
             }
@@ -5575,8 +5621,8 @@
 
         let showRemainingTime = true;
         function updateTimeLabel() {
-            const cur = video.currentTime || 0;
-            const dur = video.duration || 0;
+            const cur = getMediaCurrentTime();
+            const dur = getMediaDuration();
             const curStr = fmtTime(cur);
             const durStr = (isFinite(dur) && dur > 0) ? fmtTime(dur) : '--:--';
 
@@ -5620,16 +5666,17 @@
             function updateScrubUI(pos) {
                 seek.value = Math.round(pos * seek.max);
                 paintSeek();
-                if (video.duration) {
-                    const scrubSec = pos * video.duration;
+                const dur = getMediaDuration();
+                if (dur > 0) {
+                    const scrubSec = pos * dur;
                     const elCur = $('timeCurrent');
                     if (elCur) elCur.textContent = fmtTime(scrubSec);
                     const elRem = $('timeRemaining');
                     if (elRem) {
                         if (showRemainingTime) {
-                            elRem.textContent = '-' + fmtTime(Math.max(0, video.duration - scrubSec));
+                            elRem.textContent = '-' + fmtTime(Math.max(0, dur - scrubSec));
                         } else {
-                            elRem.textContent = fmtTime(video.duration);
+                            elRem.textContent = fmtTime(dur);
                         }
                     }
                     if (seekTooltip) {
@@ -5653,10 +5700,13 @@
                 const pos = getSeekPos(e);
                 if (scrubbing) {
                     updateScrubUI(pos);
-                } else if (seekTooltip && video.duration) {
-                    seekTooltip.textContent = fmtTime(pos * video.duration);
-                    seekTooltip.style.left = (pos * 100) + '%';
-                    seekTooltip.classList.add('show');
+                } else {
+                    const dur = getMediaDuration();
+                    if (seekTooltip && dur > 0) {
+                        seekTooltip.textContent = fmtTime(pos * dur);
+                        seekTooltip.style.left = (pos * 100) + '%';
+                        seekTooltip.classList.add('show');
+                    }
                 }
             });
 
@@ -5666,8 +5716,9 @@
                 seekWrapEl.classList.remove('scrubbing');
                 try { seekWrapEl.releasePointerCapture(e.pointerId); } catch (err) { }
                 const pos = getSeekPos(e);
-                if (video.duration) {
-                    video.currentTime = pos * video.duration;
+                const dur = getMediaDuration();
+                if (dur > 0) {
+                    seekToTime(pos * dur);
                 }
                 paintSeek();
                 if (seekTooltip && e.pointerType === 'touch') {
@@ -5686,13 +5737,25 @@
 
         seek.addEventListener('input', () => { scrubbing = true; paintSeek(); });
         seek.addEventListener('change', () => {
-            if (video.duration) video.currentTime = (seek.value / seek.max) * video.duration;
+            const dur = getMediaDuration();
+            if (dur > 0) {
+                seekToTime((seek.value / seek.max) * dur);
+            }
             scrubbing = false;
             paintSeek();
         });
 
-        video.addEventListener('durationchange', () => { updateTimeLabel(); paintSeek(); });
+        video.addEventListener('durationchange', () => {
+            if (video.duration && isFinite(video.duration) && video.duration > 30) {
+                totalMediaDuration = video.duration;
+            }
+            updateTimeLabel();
+            paintSeek();
+        });
         video.addEventListener('loadedmetadata', () => {
+            if (video.duration && isFinite(video.duration) && video.duration > 30) {
+                totalMediaDuration = video.duration;
+            }
             updateTimeLabel();
             updateResolutionBadge();
             paintSeek();
@@ -5701,8 +5764,10 @@
         video.addEventListener('canplay', paintSeek);
         video.addEventListener('timeupdate', () => {
             updateTimeLabel();
-            if (!scrubbing && video.duration) {
-                seek.value = Math.round(video.currentTime / video.duration * seek.max);
+            const dur = getMediaDuration();
+            if (!scrubbing && dur > 0) {
+                const cur = getMediaCurrentTime();
+                seek.value = Math.round(cur / dur * seek.max);
                 paintSeek();
             }
         });
@@ -7282,7 +7347,7 @@
             reloadAudio(video.currentTime || 0);
         }
 
-        function buildStreamUrlWithAudio(audioIdx) {
+        function buildStreamUrlWithAudio(audioIdx, seekSec) {
             let target = streamUrl;
             if (target.includes('/api/proxy?url=')) {
                 try {
@@ -7294,8 +7359,14 @@
             if (audioIdx === 0 && !shouldTranscodeDefault) {
                 u.searchParams.delete('aud');
                 u.searchParams.delete('audio');
+                u.searchParams.delete('ss');
             } else {
                 u.searchParams.set('aud', String(audioIdx));
+                if (typeof seekSec === 'number' && seekSec > 0) {
+                    u.searchParams.set('ss', seekSec.toFixed(2));
+                } else {
+                    u.searchParams.delete('ss');
+                }
             }
             let finalUrl = u.toString();
             if (typeof getEffectiveStreamUrl === 'function') {
@@ -7307,16 +7378,21 @@
         function switchToDefault() {
             destroyAudio();
             restoreVideoAudio();
+            const curTime = getMediaCurrentTime();
+            streamSeekOffset = 0;
+            activeBackendAudioIndex = 0;
             const targetSrc = buildStreamUrlWithAudio(0);
             const curSrc = video.currentSrc || video.src;
             if (curSrc !== targetSrc) {
-                const curTime = isFinite(video.currentTime) ? video.currentTime : 0;
                 const wasPlaying = (!video.paused && !video.ended);
+                showSpinner();
                 video.src = targetSrc;
                 const onReady = () => {
                     video.removeEventListener('loadedmetadata', onReady);
                     video.removeEventListener('canplay', onReady);
-                    if (curTime > 0 && isFinite(curTime)) video.currentTime = curTime;
+                    if (curTime > 0 && isFinite(curTime)) {
+                        try { video.currentTime = curTime; } catch (e) {}
+                    }
                     if (wasPlaying) video.play().catch(() => {});
                     hideSpinner(true);
                 };
@@ -7347,12 +7423,18 @@
             destroyAudio();
             restoreVideoAudio();
 
-            const newStreamSrc = buildStreamUrlWithAudio(idx);
+            if (idx === 0 && !shouldTranscodeDefault) {
+                switchToDefault();
+                return;
+            }
+
+            const curTime = getMediaCurrentTime();
+            const wasPlaying = (!video.paused && !video.ended);
+
+            streamSeekOffset = curTime;
+            const newStreamSrc = buildStreamUrlWithAudio(idx, curTime);
             const curSrc = video.currentSrc || video.src;
             if (curSrc === newStreamSrc) return;
-
-            const curTime = isFinite(video.currentTime) ? video.currentTime : 0;
-            const wasPlaying = (!video.paused && !video.ended);
 
             showSpinner();
             video.src = newStreamSrc;
@@ -7363,9 +7445,6 @@
                 readyFired = true;
                 video.removeEventListener('loadedmetadata', onStreamReady);
                 video.removeEventListener('canplay', onStreamReady);
-                if (curTime > 0 && isFinite(curTime)) {
-                    video.currentTime = curTime;
-                }
                 if (wasPlaying) {
                     video.play().catch(e => console.warn('[Video] resume error:', e.message));
                 }
@@ -7940,6 +8019,7 @@
             backendSubTracks = [];
             activeBackendAudioIndex = 0;
             activeBackendSubIndex = -1;
+            streamSeekOffset = 0;
             backendIntegrationActive = false;
             window.backendIntegrationActive = false;
             shouldTranscodeDefault = false;
@@ -8969,17 +9049,8 @@
             R: { total: 0, timer: null }
         };
         function applySeek(delta) {                       /* clamped + UI synced */
-            const dur = (isFinite(video.duration) && video.duration > 0) ? video.duration : Infinity;
-            const cur = video.currentTime || 0;
-            const target = Math.max(0, Math.min(dur, cur + delta));
-            video.currentTime = target;
-            /* 'seeked'/'timeupdate' will also fire, but update immediately so the
-               slider + time label never lag a frame behind */
-            if (video.duration) {
-                seek.value = Math.round(target / video.duration * seek.max);
-                paintSeek();
-                updateTimeLabel();
-            }
+            const cur = getMediaCurrentTime();
+            seekToTime(cur + delta);
         }
         function resumeLiquidGlass() {
             if (liquidGlassEnabled && window.liquidGL && window.liquidGL.resume) {
@@ -9566,6 +9637,27 @@
 
         // Initial boot: start loading if video link provided, else show landing screen
         const initParams = new URLSearchParams(window.location.search);
+        const pDur = parseFloat(initParams.get('dur') || initParams.get('duration') || '0');
+        if (pDur > 30) {
+            totalMediaDuration = pDur;
+        }
+
+        window.addEventListener('message', event => {
+            if (!event || !event.data) return;
+            if (event.data.type === 'LOAD_STREAM') {
+                if (event.data.title) {
+                    window.__OVERRIDE_TITLE__ = event.data.title;
+                    movieName.textContent = event.data.title;
+                }
+                if (typeof event.data.duration === 'number' && event.data.duration > 30) {
+                    totalMediaDuration = event.data.duration;
+                }
+                if (event.data.url) {
+                    loadStream(event.data.url, true);
+                }
+            }
+        });
+
         let initStream = window.__EARLY_STREAM_URL__ || initParams.get('video') || initParams.get('url') || initParams.get('stream');
         if (!initStream && window.location.hash) {
             try {
