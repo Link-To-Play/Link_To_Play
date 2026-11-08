@@ -643,97 +643,135 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* ============ YOUTUBE-STYLE HORIZONTAL EXPANDABLE VOLUME CONTROLLER ============ */
+        /* ============ VOLUME POPUP — VisionOS Liquid Glass Capsule Slider ============ */
         #volWrap {
             position: relative;
+            flex-shrink: 0;
             display: inline-flex;
             align-items: center;
-            height: 44px;
-            cursor: pointer;
-            flex-shrink: 0;
+            justify-content: center;
         }
 
-        #volBtn {
-            position: relative;
-            z-index: 2;
-            flex-shrink: 0;
-        }
-
-        #volTrack {
-            width: 0;
-            height: 32px;
+        #volPop {
+            position: absolute;
+            bottom: 56px;
+            left: 50%;
+            transform: translateX(-50%) translateY(8px) scale(0.92);
+            transform-origin: bottom center;
+            background: rgba(18, 18, 26, 0.88);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(28px) saturate(160%);
+            -webkit-backdrop-filter: blur(28px) saturate(160%);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+            border-radius: 24px;
+            padding: 14px 12px;
             opacity: 0;
-            margin-left: 0;
-            margin-right: 0;
-            overflow: hidden;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.34, 1.3, 0.64, 1), visibility 0.2s ease;
             display: flex;
+            flex-direction: column;
             align-items: center;
-            cursor: pointer;
-            touch-action: none;
-            transition: width 0.22s cubic-bezier(0.2, 0, 0, 1), opacity 0.22s ease, margin 0.22s ease;
-            position: relative;
-            z-index: 1;
+            gap: 10px;
+            z-index: 50;
         }
 
-        /* Expand horizontally on hover or while dragging */
+        /* Bridge the gap between #volBtn and #volPop so mouse moving between them never drops hover */
+        #volPop::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            height: 18px;
+        }
+
+        /* Hover on desktop opens the vertical popup smoothly */
         @media (hover: hover) and (pointer: fine) {
-            #volWrap:hover #volTrack,
-            #volWrap.dragging #volTrack,
-            #volWrap.touch-open #volTrack {
-                width: 62px;
+            #volWrap:hover #volPop,
+            #volWrap.dragging #volPop {
                 opacity: 1;
-                margin-left: 4px;
-                margin-right: 6px;
+                visibility: visible;
+                transform: translateX(-50%) translateY(0) scale(1);
+                pointer-events: auto;
             }
         }
 
-        #volWrap.touch-open #volTrack,
-        #volWrap.open #volTrack {
-            width: 62px;
+        #volWrap.open #volPop {
             opacity: 1;
-            margin-left: 4px;
-            margin-right: 6px;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        #volPop .vp-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        #volPop .vp-icon:hover {
+            transform: scale(1.12);
+        }
+
+        #volPop .vp-icon path {
+            fill: #fff;
+        }
+
+        #volTrack {
+            width: 26px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: none;
+            position: relative;
         }
 
         .vp-rail {
             position: relative;
-            width: 100%;
-            height: 4px;
-            border-radius: 2px;
-            background: rgba(255, 255, 255, 0.28);
+            width: 5px;
+            height: 100%;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.22);
             overflow: visible;
         }
 
         .vp-fill {
             position: absolute;
-            left: 0;
-            top: 0;
             bottom: 0;
+            left: 0;
+            right: 0;
             width: 100%;
+            height: 100%;
             background: #fff;
-            border-radius: 2px;
+            border-radius: 3px;
         }
 
         .vp-thumb {
             position: absolute;
-            top: 50%;
-            left: 100%;
-            width: 12px;
-            height: 12px;
-            transform: translate(-50%, -50%);
+            left: 50%;
+            bottom: 100%;
+            width: 13px;
+            height: 13px;
+            transform: translate(-50%, 50%);
             border-radius: 50%;
             background: #fff;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-            transition: transform 0.1s ease;
+            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 1px 4px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
         }
 
-        #volWrap:hover .vp-thumb,
-        #volWrap.dragging .vp-thumb {
-            transform: translate(-50%, -50%) scale(1.18);
-        }
-
-        #volPop {
-            display: none !important;
+        #volPop .vol-pct {
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            font-feature-settings: 'tnum';
+            min-width: 30px;
+            text-align: center;
         }
 
         /* ============ ASPECT RATIO QUICK PICKER POPUP (VisionOS Liquid Glass) ============ */
@@ -4054,22 +4092,27 @@
                 </svg>
             </button>
 
-            <!-- 2. YouTube-Style Inline Expandable Volume Controller -->
-            <div id="volWrap" class="yt-vol-wrap">
-                <button class="ctl-btn" id="volBtn" aria-label="Mute (m)" title="Mute (m)">
+            <!-- 2. Volume Wrap with VisionOS Liquid Glass Popup -->
+            <div id="volWrap">
+                <button class="ctl-btn" id="volBtn" aria-label="Volume">
                     <svg id="icoVol" viewBox="0 0 24 24">
                         <path
                             d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" />
                     </svg>
                 </button>
-                <div id="volTrack" aria-label="Volume Slider" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
-                    <div class="vp-rail">
-                        <div class="vp-fill" id="volFill"></div>
-                        <div class="vp-thumb" id="volThumb"></div>
+                <div id="volPop">
+                    <svg class="vp-icon" id="volPopIcon" viewBox="0 0 24 24" style="cursor: pointer;" title="Toggle Mute">
+                        <path
+                            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" />
+                    </svg>
+                    <div id="volTrack" aria-label="Volume Slider" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                        <div class="vp-rail">
+                            <div class="vp-fill" id="volFill"></div>
+                            <div class="vp-thumb" id="volThumb"></div>
+                        </div>
                     </div>
+                    <div class="vol-pct" id="volPct">100</div>
                 </div>
-                <span class="vol-pct" id="volPct" style="display:none">100</span>
-                <span id="volPopIcon" style="display:none"></span>
             </div>
 
             <!-- 3. Current Time -->
@@ -6018,8 +6061,14 @@
                 video.muted = pct === 0;
             }
 
-            if (volFill) volFill.style.width = pct + '%';
-            if (volThumb) volThumb.style.left = pct + '%';
+            if (volFill) {
+                volFill.style.height = pct + '%';
+                volFill.style.width = '100%';
+            }
+            if (volThumb) {
+                volThumb.style.bottom = pct + '%';
+                volThumb.style.left = '50%';
+            }
             if (volPct) volPct.textContent = pct;
             const p = isAudioMuted ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
             const icoEl = $('icoVol');
@@ -6043,18 +6092,31 @@
 
         volBtn.addEventListener('click', e => {
             e.stopPropagation();
-            toggleMute();
+            const isTouch = (e && e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
+            if (isTouch) {
+                volWrap.classList.toggle('open');
+            } else {
+                toggleMute();
+            }
             wakeUI(2500);
         });
 
-        /* YouTube-style horizontal volume slider: click or drag sets volume */
+        if (volPopIcon) {
+            volPopIcon.addEventListener('click', e => {
+                e.stopPropagation();
+                toggleMute();
+                wakeUI(2500);
+            });
+        }
+
+        /* VisionOS Liquid Glass vertical volume capsule slider: click or drag sets volume */
         let isControlHubChangingVolume = false;
         let isDraggingVolume = false;
 
-        function volFromHorizontalEvent(e) {
+        function volFromVerticalEvent(e) {
             const r = volTrack.getBoundingClientRect();
-            if (!r.width) return lastVol || 100;
-            return Math.max(0, Math.min(100, Math.round(((e.clientX - r.left) / r.width) * 100)));
+            if (!r.height) return lastVol || 100;
+            return Math.max(0, Math.min(100, Math.round((1 - (e.clientY - r.top) / r.height) * 100)));
         }
 
         volTrack.addEventListener('pointerdown', e => {
@@ -6063,7 +6125,7 @@
             isDraggingVolume = true;
             isControlHubChangingVolume = true;
             volWrap.classList.add('dragging');
-            const v = volFromHorizontalEvent(e);
+            const v = volFromVerticalEvent(e);
             setVolume(v);
             triggerVolHud(v);
             wakeUI(2500);
@@ -6071,7 +6133,7 @@
 
         volTrack.addEventListener('pointermove', e => {
             if (isDraggingVolume) {
-                const v = volFromHorizontalEvent(e);
+                const v = volFromVerticalEvent(e);
                 setVolume(v);
                 triggerVolHud(v);
                 wakeUI(2500);
@@ -6090,7 +6152,7 @@
         volTrack.addEventListener('pointerup', stopVolDrag);
         volTrack.addEventListener('pointercancel', stopVolDrag);
 
-        // Mouse wheel over volume area adjusts volume by 5%
+        // Mouse wheel over volume area (button or popup) adjusts volume by 5%
         volWrap.addEventListener('wheel', e => {
             e.preventDefault();
             e.stopPropagation();
@@ -6123,12 +6185,18 @@
             if (isBooting || isControlHubChangingVolume) return;
             if (window.clientAudioEngine && clientAudioEngine.active) return;
             const pct = video.muted ? 0 : Math.round(video.volume * 100);
-            if (volFill) volFill.style.width = pct + '%';
-            if (volThumb) volThumb.style.left = pct + '%';
+            if (volFill) {
+                volFill.style.height = pct + '%';
+                volFill.style.width = '100%';
+            }
+            if (volThumb) {
+                volThumb.style.bottom = pct + '%';
+                volThumb.style.left = '50%';
+            }
             if (volPct) volPct.textContent = pct;
             const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
             $('icoVol').innerHTML = `<path d="${p}"/>`;
-            volPopIcon.innerHTML = `<path d="${p}"/>`;
+            if (volPopIcon) volPopIcon.innerHTML = `<path d="${p}"/>`;
             const edgeIco = $('icoVolEdge');
             if (edgeIco) edgeIco.setAttribute('d', p);
 
@@ -9995,7 +10063,8 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
         const titleBar = $('titleBar'), controls = $('controls');
 
         function isMenuOpen() {
-            return (typeof settingsDrawer !== 'undefined' && settingsDrawer && settingsDrawer.classList.contains('open')) ||
+            return (typeof volWrap !== 'undefined' && volWrap && volWrap.classList.contains('open')) ||
+                   (typeof settingsDrawer !== 'undefined' && settingsDrawer && settingsDrawer.classList.contains('open')) ||
                    (typeof aspectWrap !== 'undefined' && aspectWrap && aspectWrap.classList.contains('open')) ||
                    ($('audioTrackWrap') && $('audioTrackWrap').classList.contains('open')) ||
                    ($('subTrackWrap') && $('subTrackWrap').classList.contains('open')) ||
