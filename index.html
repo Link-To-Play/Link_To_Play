@@ -5539,43 +5539,21 @@
 
         function getMediaDuration() {
             if (totalMediaDuration > 30) return totalMediaDuration;
-            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
-            if (!isTranscoded && video.duration && isFinite(video.duration) && video.duration > 180) {
+            if (video.duration && isFinite(video.duration) && video.duration > 30) {
                 return video.duration;
             }
             return 0;
         }
 
         function getMediaCurrentTime() {
-            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
-            return (isTranscoded ? streamSeekOffset : 0) + (video.currentTime || 0);
+            return video.currentTime || 0;
         }
 
         function seekToTime(targetSec) {
             const dur = getMediaDuration();
             targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
-            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
-
-            if (isTranscoded && typeof buildStreamUrlWithAudio === 'function') {
-                streamSeekOffset = targetSec;
-                const newUrl = buildStreamUrlWithAudio(activeBackendAudioIndex, targetSec);
-
-                showSpinner();
-                video.src = newUrl;
-                video.load();
-
-                const onReady = () => {
-                    video.removeEventListener('loadedmetadata', onReady);
-                    video.removeEventListener('canplay', onReady);
-                    hideSpinner(true);
-                    video.play().catch(() => {});
-                };
-                video.addEventListener('loadedmetadata', onReady, { once: true });
-                video.addEventListener('canplay', onReady, { once: true });
-            } else {
-                streamSeekOffset = 0;
-                try { video.currentTime = targetSec; } catch (e) {}
-            }
+            streamSeekOffset = 0;
+            try { video.currentTime = targetSec; } catch (e) {}
             updateTimeLabel();
             paintSeek();
         }
@@ -5584,17 +5562,15 @@
             const dur = getMediaDuration();
             if (!dur || !video.buffered || !video.buffered.length) return 0;
             const cur = getMediaCurrentTime();
-            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
-            const offset = isTranscoded ? streamSeekOffset : 0;
             for (let i = 0; i < video.buffered.length; i++) {
-                const start = offset + video.buffered.start(i);
-                const end = offset + video.buffered.end(i);
+                const start = video.buffered.start(i);
+                const end = video.buffered.end(i);
                 if (start <= cur + 1.5 && cur <= end + 1.5) {
                     return Math.min(100, (end / dur) * 100);
                 }
             }
             try {
-                const lastEnd = offset + video.buffered.end(video.buffered.length - 1);
+                const lastEnd = video.buffered.end(video.buffered.length - 1);
                 return Math.min(100, (lastEnd / dur) * 100);
             } catch (e) {
                 return 0;
@@ -5764,16 +5740,14 @@
         });
 
         video.addEventListener('durationchange', () => {
-            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
-            if (!isTranscoded && video.duration && isFinite(video.duration) && video.duration > 180) {
+            if (video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
             paintSeek();
         });
         video.addEventListener('loadedmetadata', () => {
-            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
-            if (!isTranscoded && video.duration && isFinite(video.duration) && video.duration > 180) {
+            if (video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
@@ -7301,9 +7275,6 @@
             if (activeTrackIdx === null || !activeAudio) return;
             audioLoading = true;
             silenceVideo();
-            showSpinner();
-            centerIcon.classList.remove('on', 'sticky');
-            setPlayIcon();
 
             activeAudio.oncanplay = null;
             activeAudio.onloadeddata = null;
@@ -7321,15 +7292,12 @@
             activeAudio.onerror = () => {
                 console.warn('[AudioTrack] Secondary audio stream error, falling back to native stream audio');
                 audioLoading = false;
-                hideSpinner(true);
-                setPlayIcon();
                 restoreVideoAudio();
             };
 
             const onAudioReady = () => {
                 if (activeTrackIdx === null || !activeAudio) return;
                 audioLoading = false;
-                hideSpinner(true);
                 silenceVideo();
 
                 // Compute exact offset in seconds since audio was requested from startVideoTime
@@ -7343,7 +7311,6 @@
                 } else {
                     activeAudio.pause();
                 }
-                setPlayIcon();
             };
 
             activeAudio.oncanplay = onAudioReady;
@@ -7359,6 +7326,8 @@
 
             activeAudio = document.createElement('audio');
             activeAudio.id = 'secondaryAudio';
+            activeAudio.crossOrigin = 'anonymous';
+            activeAudio.preload = 'auto';
             activeAudio.style.display = 'none';
             document.body.appendChild(activeAudio);
             window.secondaryAudio = activeAudio;
@@ -7367,59 +7336,11 @@
             reloadAudio(video.currentTime || 0);
         }
 
-        function buildStreamUrlWithAudio(audioIdx, seekSec) {
-            let target = streamUrl;
-            if (target.includes('/api/proxy?url=')) {
-                try {
-                    const m = target.match(/[?&]url=([^&]+)/);
-                    if (m && m[1]) target = decodeURIComponent(m[1]);
-                } catch (e) { }
-            }
-            const u = new URL(target, window.location.href);
-            if (audioIdx === 0 && !shouldTranscodeDefault) {
-                u.searchParams.delete('aud');
-                u.searchParams.delete('audio');
-                u.searchParams.delete('ss');
-            } else {
-                u.searchParams.set('aud', String(audioIdx));
-                if (typeof seekSec === 'number' && seekSec > 0) {
-                    u.searchParams.set('ss', seekSec.toFixed(2));
-                } else {
-                    u.searchParams.delete('ss');
-                }
-            }
-            let finalUrl = u.toString();
-            if (typeof getEffectiveStreamUrl === 'function') {
-                finalUrl = getEffectiveStreamUrl(finalUrl);
-            }
-            return finalUrl;
-        }
-
         function switchToDefault() {
             destroyAudio();
             restoreVideoAudio();
-            const curTime = getMediaCurrentTime();
-            streamSeekOffset = 0;
             activeBackendAudioIndex = 0;
-            const targetSrc = buildStreamUrlWithAudio(0);
-            const curSrc = video.currentSrc || video.src;
-            if (curSrc !== targetSrc) {
-                const wasPlaying = (!video.paused && !video.ended);
-                showSpinner();
-                video.src = targetSrc;
-                const onReady = () => {
-                    video.removeEventListener('loadedmetadata', onReady);
-                    video.removeEventListener('canplay', onReady);
-                    if (curTime > 0 && isFinite(curTime)) {
-                        try { video.currentTime = curTime; } catch (e) {}
-                    }
-                    if (wasPlaying) video.play().catch(() => {});
-                    hideSpinner(true);
-                };
-                video.addEventListener('loadedmetadata', onReady, { once: true });
-                video.addEventListener('canplay', onReady, { once: true });
-                video.load();
-            } else if (!video.paused) {
+            if (!video.paused) {
                 video.play().catch(() => { });
             }
         }
@@ -7439,51 +7360,12 @@
             }
             showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
 
-            // Clean up secondary audio and ensure native sound is fully enabled
-            destroyAudio();
-            restoreVideoAudio();
-
             if (idx === 0 && !shouldTranscodeDefault) {
                 switchToDefault();
                 return;
             }
 
-            const curTime = getMediaCurrentTime();
-            const wasPlaying = (!video.paused && !video.ended);
-
-            streamSeekOffset = curTime;
-            const newStreamSrc = buildStreamUrlWithAudio(idx, curTime);
-            const curSrc = video.currentSrc || video.src;
-            if (curSrc === newStreamSrc) return;
-
-            showSpinner();
-            video.src = newStreamSrc;
-
-            let readyFired = false;
-            const onStreamReady = () => {
-                if (readyFired) return;
-                readyFired = true;
-                video.removeEventListener('loadedmetadata', onStreamReady);
-                video.removeEventListener('canplay', onStreamReady);
-                if (wasPlaying) {
-                    video.play().catch(e => console.warn('[Video] resume error:', e.message));
-                }
-                hideSpinner(true);
-            };
-
-            // Fallback to secondary audio transcode if the backend endpoint fails with ?aud=
-            const onErrorFallback = () => {
-                video.removeEventListener('error', onErrorFallback);
-                if (video.error && newStreamSrc.includes('aud=')) {
-                    console.warn('[Backend] Native ?aud= stream returned error, falling back to secondary audio element');
-                    switchToTrack(track.index);
-                }
-            };
-
-            video.addEventListener('loadedmetadata', onStreamReady, { once: true });
-            video.addEventListener('canplay', onStreamReady, { once: true });
-            video.addEventListener('error', onErrorFallback, { once: true });
-            video.load();
+            switchToTrack(track.index);
         }
 
         /* ── Subtitles Engine (Incremental WebVTT / SRT / ASS Streaming & Custom Overlay) ── */
@@ -8076,15 +7958,22 @@
 
         video.addEventListener('timeupdate', () => {
             paintCue();
+            if (activeTrackIdx !== null && activeAudio && !audioLoading && !video.paused && !video.seeking) {
+                const expectedAudioTime = (video.currentTime || 0) - startVideoTime;
+                const audioCurrent = (activeAudio.currentTime || 0);
+                const drift = expectedAudioTime - audioCurrent;
+                if (Math.abs(drift) > 2.5) {
+                    console.log('[AudioTrack] Sync drift detected (' + drift.toFixed(2) + 's). Re-syncing...');
+                    reloadAudio(video.currentTime);
+                } else if (Math.abs(drift) > 0.25 && isFinite(expectedAudioTime) && expectedAudioTime >= 0) {
+                    try { activeAudio.currentTime = expectedAudioTime; } catch (e) {}
+                }
+            }
         });
 
         video.addEventListener('seeked', () => {
             paintCue();
             refreshSubtitleForSeek();
-            if (activeTrackIdx !== null && audioLoading) {
-                showSpinner();
-                centerIcon.classList.remove('on', 'sticky');
-            }
         });
 
         video.addEventListener('seeking', () => {
@@ -8092,8 +7981,6 @@
             if (activeTrackIdx === null || !activeAudio) return;
             audioLoading = true;
             silenceVideo();
-            showSpinner();
-            centerIcon.classList.remove('on', 'sticky');
 
             clearTimeout(seekDebounce);
             seekDebounce = setTimeout(() => {
@@ -8101,7 +7988,7 @@
                 if (activeTrackIdx !== null) {
                     reloadAudio(videoTime);
                 }
-            }, 250);
+            }, 180);
         });
 
         video.addEventListener('waiting', () => {
@@ -9549,19 +9436,9 @@
         });
         video.addEventListener('seeked', () => {
             clearTimeout(seekingSpinnerTimer);
-            if (audioLoading) {
-                showSpinner();
-                centerIcon.classList.remove('on', 'sticky');
-                return;
-            }
             if (video.readyState >= 3 && !video.paused) hideSpinner();
         });
         video.addEventListener('playing', () => {
-            if (audioLoading) {
-                showSpinner();
-                centerIcon.classList.remove('on', 'sticky');
-                return;
-            }
             hideSpinner();
             errBox.style.display = 'none';
             setPlayIcon();
