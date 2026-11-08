@@ -6778,10 +6778,109 @@
             return fn;
         }
 
+        // Continuous Stream AudioWorklet Processor definition (pure uninterrupted PCM streaming)
+        const STREAM_WORKLET_CODE = `
+class StreamAudioProcessor extends AudioWorkletProcessor {
+    constructor() {
+        super();
+        this.queue = [];
+        this.queueFrames = 0;
+        this.currentChunk = null;
+        this.chunkOffset = 0;
+        this.playbackRate = 1.0;
+        this.phase = 0.0;
+        this.totalRenderedFrames = 0;
+        this.reportCounter = 0;
+
+        this.port.onmessage = (e) => {
+            const data = e.data;
+            if (data.type === 'push') {
+                this.queue.push(data.buffers);
+                this.queueFrames += data.frames;
+            } else if (data.type === 'clear') {
+                this.queue = [];
+                this.queueFrames = 0;
+                this.currentChunk = null;
+                this.chunkOffset = 0;
+                this.phase = 0.0;
+                this.totalRenderedFrames = 0;
+                this.reportCounter = 0;
+            } else if (data.type === 'rate') {
+                this.playbackRate = Math.max(0.75, Math.min(1.5, data.rate));
+            }
+        };
+    }
+
+    process(inputs, outputs) {
+        const out = outputs[0];
+        const outChs = out.length;
+        const outLen = out[0].length; // 128 frames
+
+        if (this.queueFrames === 0 && !this.currentChunk) {
+            for (let c = 0; c < outChs; c++) out[c].fill(0);
+            return true;
+        }
+
+        const rate = this.playbackRate;
+
+        for (let i = 0; i < outLen; i++) {
+            while (!this.currentChunk || this.chunkOffset >= this.currentChunk[0].length) {
+                if (this.queue.length === 0) {
+                    this.currentChunk = null;
+                    break;
+                }
+                this.currentChunk = this.queue.shift();
+                this.chunkOffset = 0;
+            }
+
+            if (!this.currentChunk) {
+                for (let c = 0; c < outChs; c++) out[c][i] = 0;
+                continue;
+            }
+
+            const inChs = this.currentChunk.length;
+            const idx0 = this.chunkOffset;
+            const frac = this.phase;
+            const nextIdx = (idx0 + 1 < this.currentChunk[0].length) ? (idx0 + 1) : idx0;
+
+            for (let c = 0; c < outChs; c++) {
+                const srcC = (c < inChs) ? c : (inChs - 1);
+                const s0 = this.currentChunk[srcC][idx0];
+                const s1 = this.currentChunk[srcC][nextIdx];
+                out[c][i] = s0 + frac * (s1 - s0);
+            }
+
+            this.phase += rate;
+            const advance = Math.floor(this.phase);
+            this.chunkOffset += advance;
+            this.phase -= advance;
+            this.queueFrames = Math.max(0, this.queueFrames - advance);
+            this.totalRenderedFrames += advance;
+        }
+
+        if (++this.reportCounter >= 30) {
+            this.reportCounter = 0;
+            this.port.postMessage({ type: 'rendered', frames: this.totalRenderedFrames });
+        }
+
+        return true;
+    }
+}
+registerProcessor('stream-audio-processor', StreamAudioProcessor);
+`;
+
         // Client-Side Audio Engine
         window.clientAudioEngine = {
             audioCtx: null,
             masterGain: null,
+            compressor: null,
+            streamNode: null,
+            isWorklet: false,
+            _workletLoaded: false,
+            _renderedFrames: 0,
+            streamStartPTS: -1,
+            streamStarted: false,
+            sourceSampleRate: 48000,
             active: false,
             loading: false,
             selectedTrackIndex: 0,
@@ -6793,9 +6892,6 @@
             audioSink: null,
 
             decodeGeneration: 0,
-            activeNodes: new Set(),
-            nextScheduledTime: 0,
-            lastSampleEndPTS: -1,
             currentSteeredRate: 1.0,
             syncCallbackId: null,
 
@@ -6850,13 +6946,141 @@
                 if (!this.audioCtx) {
                     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
                     if (AudioContextClass) {
-                        this.audioCtx = new AudioContextClass();
+                        try {
+                            this.audioCtx = new AudioContextClass({ sampleRate: 48000, latencyHint: 'interactive' });
+                        } catch (e) {
+                            this.audioCtx = new AudioContextClass();
+                        }
+
+                        // Dynamics compressor eliminates digital clipping and buzzing spikes during loud scenes
+                        try {
+                            this.compressor = this.audioCtx.createDynamicsCompressor();
+                            this.compressor.threshold.setValueAtTime(-1.0, this.audioCtx.currentTime);
+                            this.compressor.knee.setValueAtTime(6.0, this.audioCtx.currentTime);
+                            this.compressor.ratio.setValueAtTime(4.0, this.audioCtx.currentTime);
+                            this.compressor.attack.setValueAtTime(0.003, this.audioCtx.currentTime);
+                            this.compressor.release.setValueAtTime(0.05, this.audioCtx.currentTime);
+                        } catch (e) {
+                            this.compressor = null;
+                        }
+
                         this.masterGain = this.audioCtx.createGain();
+                        if (this.compressor) {
+                            this.compressor.connect(this.masterGain);
+                        }
                         this.masterGain.connect(this.audioCtx.destination);
                         this.syncVolume();
                     }
                 }
                 return this.audioCtx;
+            },
+
+            async initStreamNode() {
+                if (this.streamNode) return this.streamNode;
+                this.initAudioContext();
+                if (!this.audioCtx) return null;
+
+                if (!this._workletLoaded && this.audioCtx.audioWorklet) {
+                    try {
+                        const blob = new Blob([STREAM_WORKLET_CODE], { type: 'application/javascript' });
+                        const blobUrl = URL.createObjectURL(blob);
+                        await this.audioCtx.audioWorklet.addModule(blobUrl);
+                        URL.revokeObjectURL(blobUrl);
+                        this._workletLoaded = true;
+                    } catch (e) {
+                        console.warn('[AudioEngine] AudioWorklet addModule failed, using ScriptProcessor fallback:', e);
+                        this._workletLoaded = false;
+                    }
+                }
+
+                if (this._workletLoaded) {
+                    this.streamNode = new AudioWorkletNode(this.audioCtx, 'stream-audio-processor', {
+                        numberOfInputs: 0,
+                        numberOfOutputs: 1,
+                        outputChannelCount: [2]
+                    });
+                    this.streamNode.port.onmessage = (e) => {
+                        if (e.data && e.data.type === 'rendered') {
+                            this._renderedFrames = e.data.frames;
+                        }
+                    };
+                    const targetInput = this.compressor || this.masterGain;
+                    this.streamNode.connect(targetInput);
+                    this.isWorklet = true;
+                } else {
+                    const bufferSize = 2048;
+                    const sp = this.audioCtx.createScriptProcessor(bufferSize, 0, 2);
+                    this._spQueue = [];
+                    this._spCurrentChunk = null;
+                    this._spChunkOffset = 0;
+                    this._spPhase = 0.0;
+                    this._spRate = 1.0;
+                    this._renderedFrames = 0;
+
+                    sp.onaudioprocess = (e) => {
+                        const outL = e.outputBuffer.getChannelData(0);
+                        const outR = e.outputBuffer.getChannelData(1);
+                        const outLen = outL.length;
+                        const rate = this._spRate || 1.0;
+
+                        for (let i = 0; i < outLen; i++) {
+                            while (!this._spCurrentChunk || this._spChunkOffset >= this._spCurrentChunk[0].length) {
+                                if (this._spQueue.length === 0) {
+                                    this._spCurrentChunk = null;
+                                    break;
+                                }
+                                this._spCurrentChunk = this._spQueue.shift();
+                                this._spChunkOffset = 0;
+                            }
+
+                            if (!this._spCurrentChunk) {
+                                outL[i] = 0;
+                                outR[i] = 0;
+                                continue;
+                            }
+
+                            const idx0 = this._spChunkOffset;
+                            const frac = this._spPhase;
+                            const nextIdx = (idx0 + 1 < this._spCurrentChunk[0].length) ? (idx0 + 1) : idx0;
+
+                            const s0L = this._spCurrentChunk[0][idx0];
+                            const s1L = this._spCurrentChunk[0][nextIdx];
+                            outL[i] = s0L + frac * (s1L - s0L);
+
+                            const s0R = this._spCurrentChunk[1][idx0];
+                            const s1R = this._spCurrentChunk[1][nextIdx];
+                            outR[i] = s0R + frac * (s1R - s0R);
+
+                            this._spPhase += rate;
+                            const adv = Math.floor(this._spPhase);
+                            this._spChunkOffset += adv;
+                            this._spPhase -= adv;
+                            this._renderedFrames += adv;
+                        }
+                    };
+
+                    const targetInput = this.compressor || this.masterGain;
+                    sp.connect(targetInput);
+                    this.streamNode = sp;
+                    this.isWorklet = false;
+                }
+
+                return this.streamNode;
+            },
+
+            clearStreamQueue() {
+                this._renderedFrames = 0;
+                this.streamStartPTS = -1;
+                this.streamStarted = false;
+                if (this.isWorklet && this.streamNode) {
+                    try { this.streamNode.port.postMessage({ type: 'clear' }); } catch (e) { }
+                } else if (this.streamNode) {
+                    this._spQueue = [];
+                    this._spCurrentChunk = null;
+                    this._spChunkOffset = 0;
+                    this._spPhase = 0.0;
+                    this._renderedFrames = 0;
+                }
             },
 
             syncVolume() {
@@ -7016,7 +7240,8 @@
                     this.syncVolume();
                     this.updateSyncUI();
 
-                    this.stopAllScheduledNodes();
+                    await this.initStreamNode();
+                    this.clearStreamQueue();
                     if (!video.paused) {
                         this.startDecodeLoop(video.currentTime || 0);
                         this.startSyncMonitoring();
@@ -7038,8 +7263,8 @@
                 if (!this.audioSink || !this.audioCtx) return;
                 if (video.paused) { this.decodeGeneration++; return; }
                 const currentGen = ++this.decodeGeneration;
-                this.nextScheduledTime = 0;
-                this.lastSampleEndPTS = -1;
+                await this.initStreamNode();
+                this.clearStreamQueue();
                 this.currentSteeredRate = video.playbackRate || 1;
                 this._severeDriftCount = 0;
 
@@ -7051,17 +7276,20 @@
                         }
 
                         // On stream startup or after seek: drop any decoded samples that ended before current video playback position
-                        if (this.lastSampleEndPTS < 0) {
+                        if (!this.streamStarted) {
                             const vNow = video.currentTime || 0;
                             if (sample.timestamp + sample.duration < vNow) {
                                 try { sample.close(); } catch (e) { }
                                 continue;
                             }
+                            this.streamStarted = true;
+                            this.streamStartPTS = sample.timestamp;
+                            this._renderedFrames = 0;
                         }
 
-                        // Flow control: keep 0.5 to 0.8 seconds buffered ahead of video for instant sync agility
-                        while (sample.timestamp > (video.currentTime || 0) + 0.8) {
-                            await new Promise(r => setTimeout(r, 60));
+                        // Flow control: keep 0.4 to 0.7 seconds buffered ahead of video for instant sync agility
+                        while (sample.timestamp > (video.currentTime || 0) + 0.7) {
+                            await new Promise(r => setTimeout(r, 50));
                             if (currentGen !== this.decodeGeneration) {
                                 try { sample.close(); } catch (e) { }
                                 return;
@@ -7081,10 +7309,9 @@
                         console.warn('[AudioEngine] Decode stream error:', iterErr);
                         this._decodeRetries = (this._decodeRetries || 0) + 1;
                         if (this._decodeRetries <= 3 && !video.paused) {
-                            // transient server hiccup: restart from the video's current position
                             setTimeout(() => {
                                 if (this.active && currentGen === this.decodeGeneration && !video.paused) {
-                                    this.stopAllScheduledNodes(true);
+                                    this.clearStreamQueue();
                                     this.startDecodeLoop(video.currentTime || 0);
                                 }
                             }, 800 * this._decodeRetries);
@@ -7097,84 +7324,60 @@
             },
 
             scheduleSample(sample) {
-                if (!this.audioCtx || !this.masterGain) {
+                if (!this.audioCtx || !this.streamNode) {
                     try { sample.close(); } catch (e) { }
                     return;
                 }
 
                 try {
-                    const samplePTS = sample.timestamp;
-                    const sampleDur = sample.duration;
-                    const channels = sample.numberOfChannels;
                     const frames = sample.numberOfFrames;
-                    const sampleRate = sample.sampleRate;
-                    const vCurrent = video.currentTime || 0;
-                    const vRate = video.playbackRate || 1;
-                    const activeRate = this.currentSteeredRate || vRate;
-                    const nowAudio = this.audioCtx.currentTime;
+                    const channels = sample.numberOfChannels;
+                    this.sourceSampleRate = sample.sampleRate || 48000;
 
-                    let startAudioTime = 0;
-                    let offset = 0;
-
-                    const isContiguous = (this.lastSampleEndPTS >= 0) && Math.abs(samplePTS - this.lastSampleEndPTS) < 0.015;
-
-                    if (isContiguous && this.nextScheduledTime > nowAudio) {
-                        startAudioTime = this.nextScheduledTime;
-                        offset = 0;
-                    } else {
-                        // Start of stream, after seek, or audio underrun:
-                        const timeDelta = (samplePTS - vCurrent) / activeRate;
-                        if (timeDelta >= 0) {
-                            startAudioTime = nowAudio + timeDelta;
-                            offset = 0;
-                        } else {
-                            startAudioTime = nowAudio;
-                            offset = Math.max(0, Math.min(sampleDur - 0.001, vCurrent - samplePTS));
-                        }
-                    }
-
-                    const audioBuffer = this.audioCtx.createBuffer(channels, frames, sampleRate);
-                    const planeData = new Float32Array(frames);
+                    const planes = [];
                     for (let c = 0; c < channels; c++) {
-                        sample.copyTo(planeData, { planeIndex: c, format: 'f32-planar' });
-                        audioBuffer.copyToChannel(planeData, c);
+                        const p = new Float32Array(frames);
+                        sample.copyTo(p, { planeIndex: c, format: 'f32-planar' });
+                        planes.push(p);
                     }
                     sample.close();
 
-                    const source = this.audioCtx.createBufferSource();
-                    source.buffer = audioBuffer;
-                    source.playbackRate.value = activeRate;
+                    const outL = new Float32Array(frames);
+                    const outR = new Float32Array(frames);
 
-                    // Micro-gain node for equal-power crossfading and DC click elimination
-                    const gainNode = this.audioCtx.createGain();
-                    gainNode.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
-                    source.connect(gainNode);
-                    gainNode.connect(this.masterGain);
+                    if (channels >= 6) {
+                        // Standard ITU-R BS.775 5.1 surround to stereo downmix with headroom normalization
+                        const FL = planes[0];
+                        const FR = planes[1];
+                        const FC = planes[2];
+                        const LFE = planes[3];
+                        const SL = planes[4];
+                        const SR = planes[5];
+                        const cGain = 0.7071;
+                        const sGain = 0.7071;
+                        const lfeGain = 0.5;
+                        const norm = 1.0 / (1.0 + cGain + sGain); // ~0.4142
 
-                    source.start(startAudioTime, offset);
-                    const scheduledDuration = Math.max(0, (sampleDur - offset) / activeRate);
-                    this.nextScheduledTime = startAudioTime + scheduledDuration;
-                    this.lastSampleEndPTS = samplePTS + sampleDur;
+                        for (let i = 0; i < frames; i++) {
+                            outL[i] = (FL[i] + cGain * FC[i] + sGain * SL[i] + lfeGain * LFE[i]) * norm;
+                            outR[i] = (FR[i] + cGain * FC[i] + sGain * SR[i] + lfeGain * LFE[i]) * norm;
+                        }
+                    } else if (channels === 1) {
+                        outL.set(planes[0]);
+                        outR.set(planes[0]);
+                    } else {
+                        outL.set(planes[0]);
+                        outR.set(planes[1]);
+                    }
 
-                    const nodeItem = {
-                        node: source,
-                        gainNode: gainNode,
-                        startAudioTime,
-                        endAudioTime: this.nextScheduledTime,
-                        samplePTS,
-                        sampleDur,
-                        offset,
-                        playbackRate: activeRate
-                    };
-                    this.activeNodes.add(nodeItem);
-
-                    source.onended = () => {
-                        this.activeNodes.delete(nodeItem);
-                        try {
-                            source.disconnect();
-                            gainNode.disconnect();
-                        } catch (e) { }
-                    };
+                    if (this.isWorklet) {
+                        this.streamNode.port.postMessage(
+                            { type: 'push', buffers: [outL, outR], frames },
+                            [outL.buffer, outR.buffer]
+                        );
+                    } else {
+                        this._spQueue.push([outL, outR]);
+                    }
                 } catch (e) {
                     console.warn('[AudioEngine] Schedule error:', e);
                     try { sample.close(); } catch (err) { }
@@ -7184,44 +7387,18 @@
             setNodesPlaybackRate(targetRate) {
                 if (!this.audioCtx) return;
                 this.currentSteeredRate = targetRate;
-                const now = this.audioCtx.currentTime;
-                for (const item of this.activeNodes) {
-                    try {
-                        item.playbackRate = targetRate;
-                        item.node.playbackRate.setValueAtTime(targetRate, now);
-                    } catch (e) {
-                        try { item.node.playbackRate.value = targetRate; } catch (e2) { }
-                    }
+                const srcRate = this.sourceSampleRate || 48000;
+                const ctxRate = this.audioCtx.sampleRate || 48000;
+                const effectiveRate = targetRate * (srcRate / ctxRate);
+                if (this.isWorklet && this.streamNode) {
+                    try { this.streamNode.port.postMessage({ type: 'rate', rate: effectiveRate }); } catch (e) { }
+                } else if (this.streamNode) {
+                    this._spRate = effectiveRate;
                 }
             },
 
             stopAllScheduledNodes(immediate = false) {
-                const now = (this.audioCtx && this.audioCtx.state === 'running') ? this.audioCtx.currentTime : 0;
-                const fadeDuration = immediate ? 0 : 0.025; // 25ms equal-power micro-crossfade eliminates DC clicks/pops
-                for (const item of this.activeNodes) {
-                    try {
-                        if (fadeDuration > 0 && item.gainNode && this.audioCtx && this.audioCtx.state === 'running') {
-                            const currentGain = item.gainNode.gain.value;
-                            item.gainNode.gain.cancelScheduledValues(now);
-                            item.gainNode.gain.setValueAtTime(currentGain, now);
-                            item.gainNode.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
-                            item.node.stop(now + fadeDuration);
-                            setTimeout(() => {
-                                try {
-                                    item.node.disconnect();
-                                    item.gainNode.disconnect();
-                                } catch (e) { }
-                            }, Math.ceil(fadeDuration * 1000) + 30);
-                        } else {
-                            item.node.stop();
-                            item.node.disconnect();
-                            if (item.gainNode) item.gainNode.disconnect();
-                        }
-                    } catch (e) { }
-                }
-                this.activeNodes.clear();
-                this.nextScheduledTime = 0;
-                this.lastSampleEndPTS = -1;
+                this.clearStreamQueue();
             },
 
             onPlay() {
@@ -7229,7 +7406,7 @@
                 if (this.audioCtx && this.audioCtx.state === 'suspended') {
                     this.audioCtx.resume();
                 }
-                this.stopAllScheduledNodes(true);
+                this.clearStreamQueue();
                 this.currentSteeredRate = video.playbackRate || 1;
                 this._lastSeekTime = Date.now();
                 this.startDecodeLoop(video.currentTime || 0);
@@ -7240,23 +7417,29 @@
                 if (!this.active) return;
                 this.decodeGeneration++;
                 this.stopSyncMonitoring();
-                this.stopAllScheduledNodes();
+                this.clearStreamQueue();
+                if (this.audioCtx && this.audioCtx.state === 'running') {
+                    try { this.audioCtx.suspend(); } catch (e) { }
+                }
             },
 
             onSeeking() {
                 if (!this.active) return;
                 this.decodeGeneration++;
                 this.stopSyncMonitoring();
-                this.stopAllScheduledNodes(true);
+                this.clearStreamQueue();
             },
 
             onSeeked() {
                 if (!this.active) return;
-                this.stopAllScheduledNodes(true);
+                this.clearStreamQueue();
                 this.currentSteeredRate = video.playbackRate || 1;
                 this._lastSeekTime = Date.now();
                 this._severeDriftCount = 0;
                 if (!video.paused) {
+                    if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                        try { this.audioCtx.resume(); } catch (e) { }
+                    }
                     this.startDecodeLoop(video.currentTime || 0);
                     this.startSyncMonitoring();
                 }
@@ -7266,13 +7449,12 @@
                 if (!this.active || !this.audioCtx) return;
                 const rate = video.playbackRate || 1;
                 this.setNodesPlaybackRate(rate);
-                this.nextScheduledTime = this.audioCtx.currentTime + Math.max(0, (this.lastSampleEndPTS - (video.currentTime || 0)) / rate);
             },
 
             onWaiting() {
                 if (!this.active) return;
                 this.stopSyncMonitoring();
-                this.stopAllScheduledNodes(true);
+                this.clearStreamQueue();
                 this.decodeGeneration++;
             },
 
@@ -7284,92 +7466,68 @@
                     }
                 } catch (e) { }
                 this._lastSeekTime = Date.now();
-                this.stopAllScheduledNodes(true);
+                this.clearStreamQueue();
                 this.startDecodeLoop(video.currentTime || 0);
                 this.startSyncMonitoring();
                 this.checkSync();
             },
 
             checkSync(currentVideoTime) {
-                if (!this.active || !this.audioCtx || video.paused || video.seeking) return;
-                const nowAudio = this.audioCtx.currentTime;
-                const hwLatency = this.getHardwareLatency();
+                if (!this.active || !this.audioCtx || video.paused || video.seeking || !this.streamStarted || this.streamStartPTS < 0) return;
                 const vCurrent = (typeof currentVideoTime === 'number') ? currentVideoTime : (video.currentTime || 0);
                 const vRate = video.playbackRate || 1;
+                const hwLatency = this.getHardwareLatency();
 
-                // Sound reaching ears right now was rendered at (nowAudio - hwLatency):
-                const audibleGraphTime = nowAudio - hwLatency;
+                const rate = this.currentSteeredRate || vRate;
+                const playedSec = (this._renderedFrames || 0) / (this.sourceSampleRate || 48000);
+                const audiblePTS = this.streamStartPTS + playedSec - (hwLatency * rate);
+                const drift = audiblePTS - vCurrent; // positive = audio ahead, negative = audio delayed
 
-                let activeNode = null;
-                for (const item of this.activeNodes) {
-                    if (item.startAudioTime <= audibleGraphTime && audibleGraphTime < item.endAudioTime) {
-                        activeNode = item;
-                        break;
+                if (Math.abs(drift) <= 0.025) {
+                    if (this.currentSteeredRate !== vRate) {
+                        this.setNodesPlaybackRate(vRate);
                     }
-                }
-
-                if (!activeNode) {
-                    for (const item of this.activeNodes) {
-                        if (item.startAudioTime <= nowAudio && nowAudio < item.endAudioTime) {
-                            activeNode = item;
-                            break;
-                        }
+                    this._severeDriftCount = 0;
+                } else if (drift < -0.025 && drift >= -0.150) {
+                    // Audio delayed 25-150ms: steer +2.5% faster
+                    const steered = vRate * 1.025;
+                    if (this.currentSteeredRate !== steered) {
+                        this.setNodesPlaybackRate(steered);
                     }
-                }
-
-                if (activeNode) {
-                    const elapsed = Math.max(0, audibleGraphTime - activeNode.startAudioTime);
-                    const nodeRate = activeNode.playbackRate || vRate;
-                    const audiblePTS = activeNode.samplePTS + (activeNode.offset || 0) + (elapsed * nodeRate);
-                    const drift = audiblePTS - vCurrent; // positive = audio ahead, negative = audio delayed
-
-                    if (Math.abs(drift) <= 0.025) {
-                        if (this.currentSteeredRate !== vRate) {
-                            this.setNodesPlaybackRate(vRate);
+                    this._severeDriftCount = 0;
+                } else if (drift > 0.025 && drift <= 0.150) {
+                    // Audio leading 25-150ms: steer -2.5% slower
+                    const steered = vRate * 0.975;
+                    if (this.currentSteeredRate !== steered) {
+                        this.setNodesPlaybackRate(steered);
+                    }
+                    this._severeDriftCount = 0;
+                } else if (drift < -0.150 && drift >= -0.600) {
+                    // Audio delayed 150-600ms: steer +5.0% faster
+                    const steered = vRate * 1.050;
+                    if (this.currentSteeredRate !== steered) {
+                        this.setNodesPlaybackRate(steered);
+                    }
+                    this._severeDriftCount = 0;
+                } else if (drift > 0.150 && drift <= 0.600) {
+                    // Audio leading 150-600ms: steer -5.0% slower
+                    const steered = vRate * 0.950;
+                    if (this.currentSteeredRate !== steered) {
+                        this.setNodesPlaybackRate(steered);
+                    }
+                    this._severeDriftCount = 0;
+                } else {
+                    const timeSinceSeek = Date.now() - (this._lastSeekTime || 0);
+                    if (timeSinceSeek > 2500) {
+                        this._severeDriftCount = (this._severeDriftCount || 0) + 1;
+                        if (this._severeDriftCount > 30) {
+                            console.log('[AudioEngine] Persistent severe drift detected:', drift.toFixed(3), 's. Resyncing...');
+                            this._severeDriftCount = 0;
+                            this.clearStreamQueue();
+                            this.startDecodeLoop(vCurrent);
                         }
-                        this._severeDriftCount = 0;
-                    } else if (drift < -0.025 && drift >= -0.150) {
-                        // Audio is delayed 25-150ms: steer +2.5% faster
-                        const steered = vRate * 1.025;
-                        if (this.currentSteeredRate !== steered) {
-                            this.setNodesPlaybackRate(steered);
-                        }
-                        this._severeDriftCount = 0;
-                    } else if (drift > 0.025 && drift <= 0.150) {
-                        // Audio is leading 25-150ms: steer -2.5% slower
-                        const steered = vRate * 0.975;
-                        if (this.currentSteeredRate !== steered) {
-                            this.setNodesPlaybackRate(steered);
-                        }
-                        this._severeDriftCount = 0;
-                    } else if (drift < -0.150 && drift >= -0.600) {
-                        // Audio delayed 150-600ms: steer +5.0% faster
-                        const steered = vRate * 1.050;
-                        if (this.currentSteeredRate !== steered) {
-                            this.setNodesPlaybackRate(steered);
-                        }
-                        this._severeDriftCount = 0;
-                    } else if (drift > 0.150 && drift <= 0.600) {
-                        // Audio leading 150-600ms: steer -5.0% slower
-                        const steered = vRate * 0.950;
-                        if (this.currentSteeredRate !== steered) {
-                            this.setNodesPlaybackRate(steered);
-                        }
-                        this._severeDriftCount = 0;
                     } else {
-                        // Math.abs(drift) > 0.600: only resync if persistent over multiple seconds and not right after seek
-                        const timeSinceSeek = Date.now() - (this._lastSeekTime || 0);
-                        if (timeSinceSeek > 2500) {
-                            this._severeDriftCount = (this._severeDriftCount || 0) + 1;
-                            if (this._severeDriftCount > 30) {
-                                console.log('[AudioEngine] Persistent severe drift detected:', drift.toFixed(3), 's. Resyncing...');
-                                this._severeDriftCount = 0;
-                                this.stopAllScheduledNodes(true);
-                                this.startDecodeLoop(vCurrent);
-                            }
-                        } else {
-                            this.setNodesPlaybackRate(drift < 0 ? (vRate * 1.05) : (vRate * 0.95));
-                        }
+                        this.setNodesPlaybackRate(drift < 0 ? (vRate * 1.05) : (vRate * 0.95));
                     }
                 }
             },
@@ -7432,6 +7590,10 @@
                 this.stopSyncMonitoring();
                 this.stopAllScheduledNodes(true);
                 this.audioSink = null;
+                if (this.streamNode) {
+                    try { this.streamNode.disconnect(); } catch (e) { }
+                    this.streamNode = null;
+                }
 
                 const btn = $('audioTrackBtn');
                 if (btn) btn.classList.remove('dolby-active');
