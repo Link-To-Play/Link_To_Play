@@ -997,6 +997,78 @@
             padding: 10px 4px;
         }
 
+        .at-sync-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-top: 8px;
+            margin-top: 6px;
+            border-top: 1px solid rgba(255, 255, 255, 0.12);
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.7);
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .at-sync-title {
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.85);
+        }
+
+        .at-sync-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .at-sync-step {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: #fff;
+            padding: 2px 7px;
+            border-radius: 6px;
+            font-size: 10.5px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .at-sync-step:hover {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+
+        .at-sync-step:active {
+            transform: scale(0.95);
+        }
+
+        .at-sync-val {
+            font-size: 11px;
+            font-weight: 600;
+            color: #38bdf8;
+            min-width: 44px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .at-sync-reset {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            font-size: 11px;
+            padding: 2px 4px;
+            transition: color 0.15s ease;
+            outline: none;
+        }
+
+        .at-sync-reset:hover {
+            color: #fff;
+        }
+
         /* ============ SUBTITLE TRACK SELECTOR POPUP (VisionOS Liquid Glass) ============ */
         #subTrackWrap {
             position: relative;
@@ -4044,6 +4116,15 @@
                     <div class="at-track-list" id="audioTrackList">
                         <div class="at-empty-note">Scanning audio tracks…</div>
                     </div>
+                    <div class="at-sync-row" id="audioSyncRow">
+                        <span class="at-sync-title">Audio Sync</span>
+                        <div class="at-sync-controls">
+                            <button class="at-sync-step" id="btnAudioSyncMinus" type="button" title="Delay Audio 25ms (-25ms)">-25ms</button>
+                            <span class="at-sync-val" id="audioSyncVal">0ms</span>
+                            <button class="at-sync-step" id="btnAudioSyncPlus" type="button" title="Advance Audio 25ms (+25ms)">+25ms</button>
+                            <button class="at-sync-reset" id="btnAudioSyncReset" type="button" title="Reset Audio Sync">↺</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -4238,6 +4319,15 @@
                 <div class="media-info-grid" id="mediaInfoGrid"></div>
                 <div class="speed-pills" id="audioPills"></div>
                 <div class="dr-note" id="audioNote"></div>
+                <div class="at-sync-row" style="margin-top: 10px; padding: 10px 18px 4px; width: 100%; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                    <span class="at-sync-title" style="color: rgba(255,255,255,0.85); font-weight: 500;">Audio Delay / Sync</span>
+                    <div class="at-sync-controls">
+                        <button class="at-sync-step" id="drBtnAudioSyncMinus" type="button" title="Delay Audio 25ms (-25ms)">-25ms</button>
+                        <span class="at-sync-val" id="drAudioSyncVal">0ms</span>
+                        <button class="at-sync-step" id="drBtnAudioSyncPlus" type="button" title="Advance Audio 25ms (+25ms)">+25ms</button>
+                        <button class="at-sync-reset" id="drBtnAudioSyncReset" type="button" title="Reset Audio Sync">↺</button>
+                    </div>
+                </div>
             </div>
 
             <button class="dr-row expanded" data-expand="secAdj">
@@ -6430,6 +6520,37 @@
             audioTrackBtn.addEventListener('touchend', onAudioTrackTrigger, { passive: false });
         }
 
+        // Audio Sync Stepper Handlers (Popup & Settings Drawer)
+        const setupAudioSyncListeners = () => {
+            const onMinus = (e) => {
+                if (e) e.stopPropagation();
+                if (window.clientAudioEngine) clientAudioEngine.setSyncOffset(clientAudioEngine.syncOffsetMs - 25);
+            };
+            const onPlus = (e) => {
+                if (e) e.stopPropagation();
+                if (window.clientAudioEngine) clientAudioEngine.setSyncOffset(clientAudioEngine.syncOffsetMs + 25);
+            };
+            const onReset = (e) => {
+                if (e) e.stopPropagation();
+                if (window.clientAudioEngine) clientAudioEngine.setSyncOffset(0);
+            };
+
+            const btnMinus = $('btnAudioSyncMinus');
+            const btnPlus = $('btnAudioSyncPlus');
+            const btnReset = $('btnAudioSyncReset');
+            if (btnMinus) btnMinus.onclick = onMinus;
+            if (btnPlus) btnPlus.onclick = onPlus;
+            if (btnReset) btnReset.onclick = onReset;
+
+            const drMinus = $('drBtnAudioSyncMinus');
+            const drPlus = $('drBtnAudioSyncPlus');
+            const drReset = $('drBtnAudioSyncReset');
+            if (drMinus) drMinus.onclick = onMinus;
+            if (drPlus) drPlus.onclick = onPlus;
+            if (drReset) drReset.onclick = onReset;
+        };
+        setupAudioSyncListeners();
+
         function showAudioToast(msg) {
             if (typeof updateCapsuleHud === 'function') {
                 const audioIconPath = 'M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z';
@@ -6675,6 +6796,55 @@
             activeNodes: new Set(),
             nextScheduledTime: 0,
             lastSampleEndPTS: -1,
+            currentSteeredRate: 1.0,
+            syncCallbackId: null,
+
+            syncOffsetMs: (function() {
+                try {
+                    const saved = localStorage.getItem('stream_audio_sync_offset');
+                    return saved !== null ? (parseInt(saved, 10) || 0) : 0;
+                } catch (e) {
+                    return 0;
+                }
+            })(),
+
+            getHardwareLatency() {
+                if (!this.audioCtx) return 0.040;
+                const base = this.audioCtx.baseLatency || 0.008;
+                const output = (typeof this.audioCtx.outputLatency === 'number') ? this.audioCtx.outputLatency : 0.032;
+                const userOffset = (this.syncOffsetMs || 0) / 1000;
+                return Math.max(0, base + output + userOffset);
+            },
+
+            setSyncOffset(ms) {
+                this.syncOffsetMs = Math.max(-1000, Math.min(1000, ms));
+                try {
+                    localStorage.setItem('stream_audio_sync_offset', this.syncOffsetMs);
+                } catch (e) { }
+                this.updateSyncUI();
+                if (typeof showAudioToast === 'function') {
+                    const sign = this.syncOffsetMs > 0 ? '+' : '';
+                    showAudioToast(`Audio Sync: ${sign}${this.syncOffsetMs}ms`);
+                }
+                if (this.active && !video.paused) {
+                    this.checkSync();
+                }
+            },
+
+            updateSyncUI() {
+                const sign = this.syncOffsetMs > 0 ? '+' : '';
+                const text = `${sign}${this.syncOffsetMs}ms`;
+                const valEl = $('audioSyncVal');
+                if (valEl) {
+                    valEl.textContent = text;
+                    valEl.style.color = this.syncOffsetMs === 0 ? '#94a3b8' : '#38bdf8';
+                }
+                const drValEl = $('drAudioSyncVal');
+                if (drValEl) {
+                    drValEl.textContent = text;
+                    drValEl.style.color = this.syncOffsetMs === 0 ? '#94a3b8' : '#38bdf8';
+                }
+            },
 
             initAudioContext() {
                 if (!this.audioCtx) {
@@ -6734,6 +6904,7 @@
                 if (changed && this.selectedTrackIndex >= mapped.length) this.selectedTrackIndex = 0;
 
                 renderAudioTrackUI(this.audioTracks, this.selectedTrackIndex);
+                this.updateSyncUI();
 
                 if (changed && this.audioTracks.length > 0) {
                     const track0 = this.audioTracks[0];
@@ -6844,9 +7015,13 @@
                     // Silence native video so silent track doesn't conflict
                     video.muted = true;
                     this.syncVolume();
+                    this.updateSyncUI();
 
                     this.stopAllScheduledNodes();
-                    if (!video.paused) this.startDecodeLoop(video.currentTime || 0);
+                    if (!video.paused) {
+                        this.startDecodeLoop(video.currentTime || 0);
+                        this.startSyncMonitoring();
+                    }
 
                     const note = $('audioNote');
                     if (note) {
@@ -6866,6 +7041,7 @@
                 const currentGen = ++this.decodeGeneration;
                 this.nextScheduledTime = 0;
                 this.lastSampleEndPTS = -1;
+                this.currentSteeredRate = video.playbackRate || 1;
 
                 try {
                     for await (const sample of this.audioSink.samples(startTime)) {
@@ -6874,9 +7050,9 @@
                             break;
                         }
 
-                        // Flow control: keep 3 to 4 seconds buffered ahead of video
-                        while (sample.timestamp > (video.currentTime || 0) + 3.5) {
-                            await new Promise(r => setTimeout(r, 180));
+                        // Flow control: keep 0.5 to 0.8 seconds buffered ahead of video for instant sync agility
+                        while (sample.timestamp > (video.currentTime || 0) + 0.8) {
+                            await new Promise(r => setTimeout(r, 60));
                             if (currentGen !== this.decodeGeneration) {
                                 try { sample.close(); } catch (e) { }
                                 return;
@@ -6925,10 +7101,54 @@
                     const sampleRate = sample.sampleRate;
                     const vCurrent = video.currentTime || 0;
                     const vRate = video.playbackRate || 1;
+                    const activeRate = this.currentSteeredRate || vRate;
+                    const nowAudio = this.audioCtx.currentTime;
+                    const hwLatency = this.getHardwareLatency();
 
-                    if (samplePTS + sampleDur < vCurrent - 0.05) {
-                        sample.close();
-                        return;
+                    // Ideal audio context time when buffer should begin playback
+                    // such that the physical sound reaches listener at samplePTS:
+                    const idealStartTime = nowAudio + ((samplePTS - vCurrent) / vRate) - hwLatency;
+
+                    let startAudioTime = 0;
+                    let offset = 0;
+
+                    const isContiguous = (this.lastSampleEndPTS >= 0) && Math.abs(samplePTS - this.lastSampleEndPTS) < 0.01;
+
+                    if (isContiguous && this.nextScheduledTime > nowAudio) {
+                        const chainDrift = this.nextScheduledTime - idealStartTime;
+                        if (Math.abs(chainDrift) < 0.025) {
+                            // Perfect gapless contiguous playback
+                            startAudioTime = this.nextScheduledTime;
+                            offset = 0;
+                        } else {
+                            // Drift exceeded 25ms: smooth re-anchor
+                            if (idealStartTime >= nowAudio) {
+                                startAudioTime = idealStartTime;
+                                offset = 0;
+                            } else {
+                                const pastSec = nowAudio - idealStartTime;
+                                offset = pastSec * activeRate;
+                                if (offset >= sampleDur) {
+                                    sample.close();
+                                    return; // Discard completely expired frame to prevent lag
+                                }
+                                startAudioTime = nowAudio;
+                            }
+                        }
+                    } else {
+                        // Start of stream / after seek / discontiguous
+                        if (idealStartTime >= nowAudio) {
+                            startAudioTime = idealStartTime;
+                            offset = 0;
+                        } else {
+                            const pastSec = nowAudio - idealStartTime;
+                            offset = pastSec * activeRate;
+                            if (offset >= sampleDur) {
+                                sample.close();
+                                return; // Dropped to ensure zero delay on start/seek
+                            }
+                            startAudioTime = nowAudio;
+                        }
                     }
 
                     const audioBuffer = this.audioCtx.createBuffer(channels, frames, sampleRate);
@@ -6941,7 +7161,7 @@
 
                     const source = this.audioCtx.createBufferSource();
                     source.buffer = audioBuffer;
-                    source.playbackRate.value = vRate;
+                    source.playbackRate.value = activeRate;
 
                     // Micro-gain node for equal-power crossfading and DC click elimination
                     const gainNode = this.audioCtx.createGain();
@@ -6949,24 +7169,8 @@
                     source.connect(gainNode);
                     gainNode.connect(this.masterGain);
 
-                    const nowAudio = this.audioCtx.currentTime;
-                    let startAudioTime = 0;
-                    let offset = 0;
-
-                    const isContiguous = (this.lastSampleEndPTS >= 0) && Math.abs(samplePTS - this.lastSampleEndPTS) < 0.01;
-
-                    if (isContiguous && this.nextScheduledTime > nowAudio) {
-                        startAudioTime = this.nextScheduledTime;
-                    } else {
-                        const timeDelta = (samplePTS - vCurrent) / vRate;
-                        startAudioTime = Math.max(nowAudio, nowAudio + timeDelta);
-                        if (samplePTS < vCurrent && startAudioTime <= nowAudio) {
-                            offset = vCurrent - samplePTS;
-                        }
-                    }
-
                     source.start(startAudioTime, offset);
-                    const scheduledDuration = Math.max(0, (sampleDur - offset) / vRate);
+                    const scheduledDuration = Math.max(0, (sampleDur - offset) / activeRate);
                     this.nextScheduledTime = startAudioTime + scheduledDuration;
                     this.lastSampleEndPTS = samplePTS + sampleDur;
 
@@ -6976,7 +7180,9 @@
                         startAudioTime,
                         endAudioTime: this.nextScheduledTime,
                         samplePTS,
-                        sampleDur
+                        sampleDur,
+                        offset,
+                        playbackRate: activeRate
                     };
                     this.activeNodes.add(nodeItem);
 
@@ -6990,6 +7196,20 @@
                 } catch (e) {
                     console.warn('[AudioEngine] Schedule error:', e);
                     try { sample.close(); } catch (err) { }
+                }
+            },
+
+            setNodesPlaybackRate(targetRate) {
+                if (!this.audioCtx) return;
+                this.currentSteeredRate = targetRate;
+                const now = this.audioCtx.currentTime;
+                for (const item of this.activeNodes) {
+                    try {
+                        item.playbackRate = targetRate;
+                        item.node.playbackRate.setValueAtTime(targetRate, now);
+                    } catch (e) {
+                        try { item.node.playbackRate.value = targetRate; } catch (e2) { }
+                    }
                 }
             },
 
@@ -7028,66 +7248,152 @@
                     this.audioCtx.resume();
                 }
                 this.stopAllScheduledNodes();
+                this.currentSteeredRate = video.playbackRate || 1;
                 this.startDecodeLoop(video.currentTime || 0);
+                this.startSyncMonitoring();
             },
 
             onPause() {
                 if (!this.active) return;
                 this.decodeGeneration++;
+                this.stopSyncMonitoring();
                 this.stopAllScheduledNodes();
             },
 
             onSeeking() {
                 if (!this.active) return;
                 this.decodeGeneration++;
+                this.stopSyncMonitoring();
                 this.stopAllScheduledNodes();
             },
 
             onSeeked() {
                 if (!this.active) return;
                 this.stopAllScheduledNodes();
+                this.currentSteeredRate = video.playbackRate || 1;
                 if (!video.paused) {
                     this.startDecodeLoop(video.currentTime || 0);
+                    this.startSyncMonitoring();
                 }
             },
 
             onRateChange() {
                 if (!this.active || !this.audioCtx) return;
                 const rate = video.playbackRate || 1;
-                for (const item of this.activeNodes) {
-                    try { item.node.playbackRate.value = rate; } catch (e) { }
-                }
+                this.setNodesPlaybackRate(rate);
                 this.nextScheduledTime = this.audioCtx.currentTime + Math.max(0, (this.lastSampleEndPTS - (video.currentTime || 0)) / rate);
             },
 
             onWaiting() {
-                if (!this.active || !this.audioCtx) return;
-                try { this.audioCtx.suspend(); } catch (e) { }
+                if (!this.active) return;
+                this.stopSyncMonitoring();
             },
 
             onPlaying() {
                 if (!this.active || !this.audioCtx) return;
-                try { this.audioCtx.resume(); } catch (e) { }
+                try {
+                    if (this.audioCtx.state === 'suspended') {
+                        this.audioCtx.resume();
+                    }
+                } catch (e) { }
+                this.startSyncMonitoring();
+                this.checkSync();
             },
 
-            checkSync() {
+            checkSync(currentVideoTime) {
                 if (!this.active || !this.audioCtx || video.paused || video.seeking) return;
                 const nowAudio = this.audioCtx.currentTime;
+                const hwLatency = this.getHardwareLatency();
+                const vCurrent = (typeof currentVideoTime === 'number') ? currentVideoTime : (video.currentTime || 0);
+                const vRate = video.playbackRate || 1;
+
+                // Sound reaching ears right now was rendered at (nowAudio - hwLatency):
+                const audibleGraphTime = nowAudio - hwLatency;
+
                 let activeNode = null;
                 for (const item of this.activeNodes) {
-                    if (item.startAudioTime <= nowAudio && nowAudio < item.endAudioTime) {
+                    if (item.startAudioTime <= audibleGraphTime && audibleGraphTime < item.endAudioTime) {
                         activeNode = item;
                         break;
                     }
                 }
-                if (activeNode) {
-                    const audioMediaPTS = activeNode.samplePTS + (nowAudio - activeNode.startAudioTime) * (video.playbackRate || 1);
-                    const drift = Math.abs((video.currentTime || 0) - audioMediaPTS);
-                    if (drift > 0.18) {
-                        console.log('[AudioEngine] Drift detected:', drift.toFixed(3), 's. Resyncing...');
-                        this.stopAllScheduledNodes();
-                        this.startDecodeLoop(video.currentTime || 0);
+
+                if (!activeNode) {
+                    for (const item of this.activeNodes) {
+                        if (item.startAudioTime <= nowAudio && nowAudio < item.endAudioTime) {
+                            activeNode = item;
+                            break;
+                        }
                     }
+                }
+
+                if (activeNode) {
+                    const elapsed = Math.max(0, audibleGraphTime - activeNode.startAudioTime);
+                    const nodeRate = activeNode.playbackRate || vRate;
+                    const audiblePTS = activeNode.samplePTS + (activeNode.offset || 0) + (elapsed * nodeRate);
+                    const drift = audiblePTS - vCurrent; // positive = audio ahead, negative = audio delayed
+
+                    if (Math.abs(drift) <= 0.020) {
+                        if (this.currentSteeredRate !== vRate) {
+                            this.setNodesPlaybackRate(vRate);
+                        }
+                    } else if (drift < -0.020 && drift >= -0.100) {
+                        // Audio is delayed 20-100ms: steer +1.5% faster
+                        const steered = vRate * 1.015;
+                        if (this.currentSteeredRate !== steered) {
+                            this.setNodesPlaybackRate(steered);
+                        }
+                    } else if (drift > 0.020 && drift <= 0.100) {
+                        // Audio is leading 20-100ms: steer -1.5% slower
+                        const steered = vRate * 0.985;
+                        if (this.currentSteeredRate !== steered) {
+                            this.setNodesPlaybackRate(steered);
+                        }
+                    } else if (Math.abs(drift) > 0.100) {
+                        if (Math.abs(drift) > 0.220) {
+                            console.log('[AudioEngine] Severe drift detected:', drift.toFixed(3), 's. Resyncing...');
+                            this.stopAllScheduledNodes();
+                            this.startDecodeLoop(vCurrent);
+                        } else if (drift < 0) {
+                            this.setNodesPlaybackRate(vRate * 1.035);
+                        } else {
+                            this.setNodesPlaybackRate(vRate * 0.965);
+                        }
+                    }
+                }
+            },
+
+            startSyncMonitoring() {
+                this.stopSyncMonitoring();
+                if (!this.active || !video || video.paused) return;
+
+                if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+                    const onFrame = (now, metadata) => {
+                        if (!this.active || video.paused) return;
+                        this.checkSync(metadata ? metadata.mediaTime : video.currentTime);
+                        this.syncCallbackId = video.requestVideoFrameCallback(onFrame);
+                    };
+                    this.syncCallbackId = video.requestVideoFrameCallback(onFrame);
+                } else {
+                    const interval = setInterval(() => {
+                        if (!this.active || video.paused) {
+                            clearInterval(interval);
+                            return;
+                        }
+                        this.checkSync(video.currentTime);
+                    }, 100);
+                    this.syncCallbackId = interval;
+                }
+            },
+
+            stopSyncMonitoring() {
+                if (this.syncCallbackId !== null) {
+                    if (typeof this.syncCallbackId === 'number' && video && 'cancelVideoFrameCallback' in video) {
+                        try { video.cancelVideoFrameCallback(this.syncCallbackId); } catch (e) { }
+                    } else {
+                        clearInterval(this.syncCallbackId);
+                    }
+                    this.syncCallbackId = null;
                 }
             },
 
@@ -7096,6 +7402,7 @@
                 this.loading = false;
                 this.selectedTrackIndex = 0;
                 this.decodeGeneration++;
+                this.stopSyncMonitoring();
                 this.stopAllScheduledNodes(true);
                 this.audioSink = null;
                 this.mediabunnyInput = null;
@@ -7111,6 +7418,7 @@
                 this.active = false;
                 this.loading = false;
                 this.decodeGeneration++;
+                this.stopSyncMonitoring();
                 this.stopAllScheduledNodes(true);
                 this.audioSink = null;
 
@@ -9825,6 +10133,27 @@
                 e.preventDefault();
                 if (typeof cycleSubtitleTrack === 'function') {
                     cycleSubtitleTrack();
+                }
+                return;
+            }
+            else if (e.code === 'BracketLeft' || e.key === '[') {
+                e.preventDefault();
+                if (window.clientAudioEngine) {
+                    clientAudioEngine.setSyncOffset(clientAudioEngine.syncOffsetMs - 25);
+                }
+                return;
+            }
+            else if (e.code === 'BracketRight' || e.key === ']') {
+                e.preventDefault();
+                if (window.clientAudioEngine) {
+                    clientAudioEngine.setSyncOffset(clientAudioEngine.syncOffsetMs + 25);
+                }
+                return;
+            }
+            else if (e.code === 'Backslash' || e.key === '\\') {
+                e.preventDefault();
+                if (window.clientAudioEngine) {
+                    clientAudioEngine.setSyncOffset(0);
                 }
                 return;
             }
