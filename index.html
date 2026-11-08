@@ -5570,7 +5570,7 @@
                     }
                 }
             } catch (e) { }
-            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 30) {
                 return video.duration;
             }
@@ -5578,7 +5578,7 @@
         }
 
         function getMediaCurrentTime() {
-            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
             return (isMapped ? streamSeekOffset : 0) + (video.currentTime || 0);
         }
 
@@ -5670,7 +5670,7 @@
         function seekToTime(targetSec) {
             const dur = getMediaDuration();
             targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
-            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
 
             if (isMapped) {
                 // Immediate UI update for smooth dragging & button feedback
@@ -5695,7 +5695,7 @@
             const dur = getMediaDuration();
             if (!dur || !video.buffered || !video.buffered.length) return 0;
             const cur = getMediaCurrentTime();
-            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
             const offset = isMapped ? streamSeekOffset : 0;
             for (let i = 0; i < video.buffered.length; i++) {
                 const start = offset + video.buffered.start(i);
@@ -5875,7 +5875,7 @@
         });
 
         video.addEventListener('durationchange', () => {
-            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
@@ -5883,7 +5883,7 @@
             paintSeek();
         });
         video.addEventListener('loadedmetadata', () => {
-            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
@@ -6459,10 +6459,10 @@
                     if (e.cancelable && e.type === 'touchend') e.preventDefault();
                 }
                 const idx = parseInt(btn.dataset.trackIndex, 10);
-                if (window.backendIntegrationActive) {
-                    selectBackendAudioTrack(idx);
-                } else if (window.clientAudioEngine) {
+                if (window.clientAudioEngine) {
                     clientAudioEngine.selectTrack(idx);
+                } else if (window.backendIntegrationActive) {
+                    selectBackendAudioTrack(idx);
                 }
                 toggleAudioTrackPop(false);
                 wakeUI(3500);
@@ -6481,10 +6481,10 @@
                     btn.addEventListener('click', e => {
                         e.stopPropagation();
                         const idx = parseInt(btn.dataset.trackIndex, 10);
-                        if (window.backendIntegrationActive) {
-                            selectBackendAudioTrack(idx);
-                        } else if (window.clientAudioEngine) {
+                        if (window.clientAudioEngine) {
                             clientAudioEngine.selectTrack(idx);
+                        } else if (window.backendIntegrationActive) {
+                            selectBackendAudioTrack(idx);
                         }
                     });
                 });
@@ -7078,9 +7078,13 @@
             },
 
             handleFailure(err) {
-                console.error('[AudioEngine] Falling back to native audio:', err);
+                console.error('[AudioEngine] Activation failed, falling back to backend remux:', err);
                 this.deactivate();
-                showDolbyFallbackPrompt();
+                if (typeof selectBackendAudioTrack === 'function' && typeof this.selectedTrackIndex === 'number') {
+                    selectBackendAudioTrack(this.selectedTrackIndex);
+                } else {
+                    showDolbyFallbackPrompt();
+                }
             }
         };
 
@@ -7961,7 +7965,6 @@
                     }
                     backendIntegrationActive = true;
                     window.backendIntegrationActive = true;
-                    if (window.clientAudioEngine) clientAudioEngine.deactivate();
 
                     const audioTracks = tracks.filter(t => {
                         const ctype = (t.codec_type || t.type || '').toLowerCase();
@@ -8036,6 +8039,10 @@
 
                     renderAudioTrackUI(backendAudioTracks, 0);
                     renderSubTrackUI(backendSubTracks, -1);
+
+                    if (window.clientAudioEngine) {
+                        clientAudioEngine.setTracks(backendAudioTracks);
+                    }
 
                     // Pre-warm the first text subtitle track from ss=0 in background for instant availability
                     if (backendSubTracks.length > 0) {
