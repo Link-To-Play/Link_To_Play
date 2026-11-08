@@ -5526,10 +5526,24 @@
         let totalMediaDuration = 0;
         let streamSeekOffset = 0;
 
+        function setTotalMediaDuration(newDur) {
+            if (typeof newDur !== 'number' || !isFinite(newDur) || newDur <= 30) return;
+            // Prevent smaller chunk buffer durations from overwriting established movie duration
+            if (totalMediaDuration > 180 && newDur < totalMediaDuration * 0.8) {
+                return;
+            }
+            totalMediaDuration = newDur;
+            updateTimeLabel();
+            paintSeek();
+        }
+
         function getMediaDuration() {
             if (totalMediaDuration > 30) return totalMediaDuration;
-            if (video.duration && isFinite(video.duration) && video.duration > 30) return video.duration;
-            return (video.duration && isFinite(video.duration)) ? video.duration : 0;
+            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            if (!isTranscoded && video.duration && isFinite(video.duration) && video.duration > 180) {
+                return video.duration;
+            }
+            return 0;
         }
 
         function getMediaCurrentTime() {
@@ -5588,7 +5602,11 @@
         }
 
         function paintSeek() {
-            const playPct = Math.max(0, Math.min(100, (seek.value / seek.max) * 100));
+            const dur = getMediaDuration();
+            const cur = getMediaCurrentTime();
+            const playPct = (scrubbing || dur <= 0)
+                ? Math.max(0, Math.min(100, (seek.value / seek.max) * 100))
+                : Math.max(0, Math.min(100, (cur / dur) * 100));
             const bufPct = Math.max(playPct, getBufferedPct());
             seek.style.background = `linear-gradient(to right,
         #ffffff 0%, #ffffff ${playPct}%,
@@ -5746,15 +5764,17 @@
         });
 
         video.addEventListener('durationchange', () => {
-            if (video.duration && isFinite(video.duration) && video.duration > 30) {
-                totalMediaDuration = video.duration;
+            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            if (!isTranscoded && video.duration && isFinite(video.duration) && video.duration > 180) {
+                setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
             paintSeek();
         });
         video.addEventListener('loadedmetadata', () => {
-            if (video.duration && isFinite(video.duration) && video.duration > 30) {
-                totalMediaDuration = video.duration;
+            const isTranscoded = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            if (!isTranscoded && video.duration && isFinite(video.duration) && video.duration > 180) {
+                setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
             updateResolutionBadge();
@@ -7905,6 +7925,13 @@
                 const tracks = await res.json();
                 if (Array.isArray(tracks) && tracks.length >= 1) {
                     console.log('[Backend] Successfully loaded track specifications:', tracks);
+                    for (const t of tracks) {
+                        const d = parseFloat(t.format_duration || t.duration || '0');
+                        if (d > 30) {
+                            setTotalMediaDuration(d);
+                            break;
+                        }
+                    }
                     backendIntegrationActive = true;
                     window.backendIntegrationActive = true;
                     if (window.clientAudioEngine) clientAudioEngine.deactivate();
@@ -8409,14 +8436,18 @@
             return tracks.length > 0 ? tracks : null;
         }
 
-        function parseEbmlTitle(buf) {
-            if (!buf || buf.length < 16) return null;
+        function parseEbmlInfo(buf) {
+            if (!buf || buf.length < 16) return { title: null, duration: 0 };
+            let title = null;
+            let rawDuration = 0;
+            let timecodeScale = 1000000; // default 1,000,000 ns = 1 ms
+
             // Scan for Segment Info (0x15, 0x49, 0xa9, 0x66) in header
             for (let i = 0; i < Math.min(buf.length - 8, 131072); i++) {
                 if (buf[i] === 0x15 && buf[i + 1] === 0x49 && buf[i + 2] === 0xa9 && buf[i + 3] === 0x66) {
                     let pos = i + 4;
                     const infoSize = readVint(buf, pos);
-                    if (!infoSize) return null;
+                    if (!infoSize) break;
                     pos += infoSize.len;
                     const end = Math.min(buf.length, pos + infoSize.val);
                     while (pos < end - 3) {
@@ -8428,14 +8459,28 @@
                         pos += sz.len;
                         if (id.val === 0x7ba9) { // Title element
                             const t = readUtf8(buf, pos, sz.val);
-                            if (t && t.trim()) return t.trim();
+                            if (t && t.trim()) title = t.trim();
+                        } else if (id.val === 0x2ad7b1) { // TimestampScale (TimecodeScale in ns)
+                            const scale = readUint(buf, pos, sz.val);
+                            if (scale > 0) timecodeScale = scale;
+                        } else if (id.val === 0x4489) { // Duration (in TimecodeScale units)
+                            const dur = readFloat(buf, pos, sz.val);
+                            if (dur > 0) rawDuration = dur;
                         }
                         pos += sz.val;
                     }
                     break;
                 }
             }
-            return null;
+            let durationSec = 0;
+            if (rawDuration > 0) {
+                durationSec = (rawDuration * timecodeScale) / 1000000000;
+            }
+            return { title, duration: durationSec };
+        }
+
+        function parseEbmlTitle(buf) {
+            return parseEbmlInfo(buf).title;
         }
 
         function parseMp4Tracks(buf) {
@@ -8467,6 +8512,21 @@
                 const trakSize = view.getUint32(offset);
                 const trakType = readAscii(buf, offset + 4, 4);
                 if (trakSize < 8) break;
+                if (trakType === 'mvhd' && offset + 28 <= moovEnd) {
+                    const ver = buf[offset + 8];
+                    let timescale = 0, duration = 0;
+                    if (ver === 1 && offset + 36 <= moovEnd) {
+                        timescale = view.getUint32(offset + 28);
+                        duration = Number(view.getBigUint64(offset + 32));
+                    } else {
+                        timescale = view.getUint32(offset + 20);
+                        duration = view.getUint32(offset + 24);
+                    }
+                    if (timescale > 0 && duration > 0) {
+                        const durSec = duration / timescale;
+                        if (durSec > 30) setTotalMediaDuration(durSec);
+                    }
+                }
                 if (trakType === 'trak') {
                     const trakEnd = Math.min(moovEnd, offset + trakSize);
                     let sub = offset + 8;
@@ -8821,14 +8881,17 @@
                         const buf = new Uint8Array(await res.arrayBuffer());
                         if (buf.length > 16 && buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3) {
                             mediaFileInfo.format = 'Matroska (MKV)';
-                            const ebmlTitle = parseEbmlTitle(buf);
-                            if (ebmlTitle && !isOpaqueId(ebmlTitle)) {
-                                const clean = cleanTitleString(ebmlTitle);
+                            const ebmlInfo = parseEbmlInfo(buf);
+                            if (ebmlInfo.title && !isOpaqueId(ebmlInfo.title)) {
+                                const clean = cleanTitleString(ebmlInfo.title);
                                 if (clean && !isOpaqueId(clean)) {
                                     movieName.textContent = clean;
                                     document.title = clean + ' · Stream Player Pro';
                                     try { localStorage.setItem('stream_title_cache:' + url, clean); } catch (e) { }
                                 }
+                            }
+                            if (ebmlInfo.duration > 30) {
+                                setTotalMediaDuration(ebmlInfo.duration);
                             }
 
                             let tracks = parseEbmlTracks(buf);
