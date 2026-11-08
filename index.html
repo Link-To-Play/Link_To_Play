@@ -5570,7 +5570,7 @@
                     }
                 }
             } catch (e) { }
-            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 30) {
                 return video.duration;
             }
@@ -5578,7 +5578,7 @@
         }
 
         function getMediaCurrentTime() {
-            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
             return (isMapped ? streamSeekOffset : 0) + (video.currentTime || 0);
         }
 
@@ -5616,7 +5616,7 @@
             const dur = getMediaDuration();
             targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
 
-            const isMapped = (aIdx > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const isMapped = (aIdx > 0);
 
             if (!isMapped) {
                 // Native default stream (byte-range seekable!)
@@ -5670,7 +5670,7 @@
         function seekToTime(targetSec) {
             const dur = getMediaDuration();
             targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
-            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
 
             if (isMapped) {
                 // Immediate UI update for smooth dragging & button feedback
@@ -5695,7 +5695,7 @@
             const dur = getMediaDuration();
             if (!dur || !video.buffered || !video.buffered.length) return 0;
             const cur = getMediaCurrentTime();
-            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
             const offset = isMapped ? streamSeekOffset : 0;
             for (let i = 0; i < video.buffered.length; i++) {
                 const start = offset + video.buffered.start(i);
@@ -5875,7 +5875,7 @@
         });
 
         video.addEventListener('durationchange', () => {
-            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
@@ -5883,7 +5883,7 @@
             paintSeek();
         });
         video.addEventListener('loadedmetadata', () => {
-            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && ((typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault));
+            const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
@@ -8022,15 +8022,7 @@
                         };
                     });
 
-                    // Check if default track needs transcoding
                     shouldTranscodeDefault = false;
-                    const firstTrack = audioTracks[0];
-                    if (firstTrack && firstTrack.codec_name) {
-                        const codec = firstTrack.codec_name.toLowerCase();
-                        if (codec === 'ac3' || codec === 'eac3' || codec === 'dts' || codec === 'truehd') {
-                            shouldTranscodeDefault = true;
-                        }
-                    }
 
                     // Update media info display
                     mediaFileInfo.audioTracks = backendAudioTracks;
@@ -8052,10 +8044,17 @@
                         }
                     }
 
-                    // Auto-switch to first track if unsupported
+                    // Auto-switch to client-side decoder if default track is Dolby/DTS
+                    const firstTrack = audioTracks[0];
+                    const firstCodec = (firstTrack?.codec_name || '').toLowerCase();
+                    const isDolbyDefault = /^(ac-?3|e-?ac-?3|ec-?3|dd\+|dts|truehd|dolby)/i.test(firstCodec);
                     const hasAudsFilter = new URL(target, window.location.href).searchParams.has('auds');
-                    if (shouldTranscodeDefault || hasAudsFilter) {
-                        console.log(`[AudioTrack] Auto-switching to first audio track (codec: ${firstTrack.codec_name})`);
+
+                    if (window.clientAudioEngine && isDolbyDefault) {
+                        console.log(`[AudioEngine] Dolby track detected (${firstCodec}), activating client-side WASM decoder for track 0.`);
+                        clientAudioEngine.selectTrack(0);
+                    } else if (hasAudsFilter) {
+                        console.log(`[AudioTrack] Explicit auds filter present, using mapped audio track 0`);
                         selectBackendAudioTrack(0);
                     } else {
                         console.log(`[AudioTrack] Native audio codec detected (${firstTrack?.codec_name || 'AAC'}), zero overhead.`);
