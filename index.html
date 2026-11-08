@@ -372,13 +372,11 @@
             transform: translateY(-8px) !important;
         }
 
-        /* Hovering controls/title or hovering near bottom of player appears smoothly on mouse devices only */
+        /* Hovering controls/title appears smoothly on mouse devices only */
         @media (hover: hover) and (pointer: fine) {
 
             #stage:not(.hide-ui) #controls:hover,
-            #stage:not(.hide-ui) #titleBar:hover,
-            #stage.mouse-near-bottom:not(.hide-ui) #controls,
-            #stage.mouse-near-bottom:not(.hide-ui) #titleBar {
+            #stage:not(.hide-ui) #titleBar:hover {
                 opacity: 1 !important;
                 pointer-events: auto !important;
                 transform: translateY(0) scale(1) !important;
@@ -645,101 +643,97 @@
             font-variant-numeric: tabular-nums;
         }
 
-        /* ============ VOLUME POPUP — VisionOS Liquid Glass Capsule Slider ============ */
+        /* ============ YOUTUBE-STYLE HORIZONTAL EXPANDABLE VOLUME CONTROLLER ============ */
         #volWrap {
             position: relative;
-            flex-shrink: 0;
-        }
-
-        #volPop {
-            position: absolute;
-            bottom: 56px;
-            left: 50%;
-            transform: translateX(-50%) translateY(8px) scale(0.9);
-            transform-origin: bottom;
-            background: rgba(18, 18, 26, 0.82);
-            border: 1px solid rgba(255, 255, 255, 0.18);
-            backdrop-filter: blur(28px) saturate(160%);
-            -webkit-backdrop-filter: blur(28px) saturate(160%);
-            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-            border-radius: 24px;
-            padding: 14px 12px;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.3, 0.64, 1);
-            display: none !important;
-            flex-direction: column;
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
-            z-index: 50;
-        }
-
-        #volWrap.open #volPop {
-            display: flex !important;
-            opacity: 1;
-            transform: translateX(-50%) translateY(0) scale(1);
-            pointer-events: auto;
-        }
-
-        #volPop .vp-icon {
-            width: 20px;
-            height: 20px;
+            height: 44px;
+            cursor: pointer;
             flex-shrink: 0;
         }
 
-        #volPop .vp-icon path {
-            fill: #fff;
+        #volBtn {
+            position: relative;
+            z-index: 2;
+            flex-shrink: 0;
         }
 
         #volTrack {
-            width: 26px;
-            height: 120px;
+            width: 0;
+            height: 32px;
+            opacity: 0;
+            margin-left: 0;
+            margin-right: 0;
+            overflow: hidden;
             display: flex;
             align-items: center;
-            justify-content: center;
             cursor: pointer;
             touch-action: none;
+            transition: width 0.22s cubic-bezier(0.2, 0, 0, 1), opacity 0.22s ease, margin 0.22s ease;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Expand horizontally on hover or while dragging */
+        @media (hover: hover) and (pointer: fine) {
+            #volWrap:hover #volTrack,
+            #volWrap.dragging #volTrack,
+            #volWrap.touch-open #volTrack {
+                width: 62px;
+                opacity: 1;
+                margin-left: 4px;
+                margin-right: 6px;
+            }
+        }
+
+        #volWrap.touch-open #volTrack,
+        #volWrap.open #volTrack {
+            width: 62px;
+            opacity: 1;
+            margin-left: 4px;
+            margin-right: 6px;
         }
 
         .vp-rail {
             position: relative;
-            width: 5px;
-            height: 100%;
-            border-radius: 3px;
-            background: rgba(255, 255, 255, 0.22);
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.28);
             overflow: visible;
         }
 
         .vp-fill {
             position: absolute;
-            bottom: 0;
             left: 0;
-            right: 0;
-            height: 100%;
+            top: 0;
+            bottom: 0;
+            width: 100%;
             background: #fff;
-            border-radius: 3px;
+            border-radius: 2px;
         }
 
         .vp-thumb {
             position: absolute;
-            left: 50%;
-            bottom: 100%;
-            width: 13px;
-            height: 13px;
-            transform: translate(-50%, 50%);
+            top: 50%;
+            left: 100%;
+            width: 12px;
+            height: 12px;
+            transform: translate(-50%, -50%);
             border-radius: 50%;
             background: #fff;
-            box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 1px 4px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+            transition: transform 0.1s ease;
         }
 
-        #volPop .vol-pct {
-            color: #fff;
-            font-family: 'Inter', sans-serif;
-            font-size: 11px;
-            font-weight: 600;
-            font-feature-settings: 'tnum';
-            min-width: 30px;
-            text-align: center;
+        #volWrap:hover .vp-thumb,
+        #volWrap.dragging .vp-thumb {
+            transform: translate(-50%, -50%) scale(1.18);
+        }
+
+        #volPop {
+            display: none !important;
         }
 
         /* ============ ASPECT RATIO QUICK PICKER POPUP (VisionOS Liquid Glass) ============ */
@@ -4060,27 +4054,22 @@
                 </svg>
             </button>
 
-            <!-- 2. Volume Wrap with Liquid Glass Popup -->
-            <div id="volWrap">
-                <button class="ctl-btn" id="volBtn" aria-label="Volume">
+            <!-- 2. YouTube-Style Inline Expandable Volume Controller -->
+            <div id="volWrap" class="yt-vol-wrap">
+                <button class="ctl-btn" id="volBtn" aria-label="Mute (m)" title="Mute (m)">
                     <svg id="icoVol" viewBox="0 0 24 24">
                         <path
                             d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" />
                     </svg>
                 </button>
-                <div id="volPop">
-                    <svg class="vp-icon" id="volPopIcon" viewBox="0 0 24 24">
-                        <path
-                            d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM14 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z" />
-                    </svg>
-                    <div id="volTrack">
-                        <div class="vp-rail">
-                            <div class="vp-fill" id="volFill"></div>
-                            <div class="vp-thumb" id="volThumb"></div>
-                        </div>
+                <div id="volTrack" aria-label="Volume Slider" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                    <div class="vp-rail">
+                        <div class="vp-fill" id="volFill"></div>
+                        <div class="vp-thumb" id="volThumb"></div>
                     </div>
-                    <div class="vol-pct" id="volPct">100</div>
                 </div>
+                <span class="vol-pct" id="volPct" style="display:none">100</span>
+                <span id="volPopIcon" style="display:none"></span>
             </div>
 
             <!-- 3. Current Time -->
@@ -6029,50 +6018,95 @@
                 video.muted = pct === 0;
             }
 
-            volFill.style.height = pct + '%';
-            volThumb.style.bottom = pct + '%';
-            volPct.textContent = pct;
-            const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
-            $('icoVol').innerHTML = `<path d="${p}"/>`;
-            volPopIcon.innerHTML = `<path d="${p}"/>`;
+            if (volFill) volFill.style.width = pct + '%';
+            if (volThumb) volThumb.style.left = pct + '%';
+            if (volPct) volPct.textContent = pct;
+            const p = isAudioMuted ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
+            const icoEl = $('icoVol');
+            if (icoEl) icoEl.innerHTML = `<path d="${p}"/>`;
+            const popIco = $('volPopIcon');
+            if (popIco) popIco.innerHTML = `<path d="${p}"/>`;
             const edgeIco = $('icoVolEdge');
             if (edgeIco) edgeIco.setAttribute('d', p);
         }
+
+        function toggleMute() {
+            if (isAudioMuted || (video.muted && !(window.clientAudioEngine && clientAudioEngine.active))) {
+                const restore = (lastVol > 0) ? lastVol : 100;
+                setVolume(restore);
+                triggerVolHud(restore);
+            } else {
+                setVolume(0);
+                triggerVolHud(0);
+            }
+        }
+
         volBtn.addEventListener('click', e => {
             e.stopPropagation();
-            volWrap.classList.toggle('open');
+            toggleMute();
+            wakeUI(2500);
         });
-        /* capsule track: click or drag sets volume (pointer capture keeps the
-           drag alive if the finger strays off the thin rail) */
+
+        /* YouTube-style horizontal volume slider: click or drag sets volume */
         let isControlHubChangingVolume = false;
-        function volFromEvent(e) {
+        let isDraggingVolume = false;
+
+        function volFromHorizontalEvent(e) {
             const r = volTrack.getBoundingClientRect();
-            return Math.max(0, Math.min(100, (1 - (e.clientY - r.top) / r.height) * 100));
+            if (!r.width) return lastVol || 100;
+            return Math.max(0, Math.min(100, Math.round(((e.clientX - r.left) / r.width) * 100)));
         }
+
         volTrack.addEventListener('pointerdown', e => {
             e.stopPropagation();
             try { volTrack.setPointerCapture(e.pointerId); } catch (_) { }
+            isDraggingVolume = true;
             isControlHubChangingVolume = true;
-            const v = volFromEvent(e);
+            volWrap.classList.add('dragging');
+            const v = volFromHorizontalEvent(e);
             setVolume(v);
+            triggerVolHud(v);
+            wakeUI(2500);
         });
+
         volTrack.addEventListener('pointermove', e => {
-            if (isControlHubChangingVolume || e.buttons) {
-                isControlHubChangingVolume = true;
-                const v = volFromEvent(e);
+            if (isDraggingVolume) {
+                const v = volFromHorizontalEvent(e);
                 setVolume(v);
+                triggerVolHud(v);
+                wakeUI(2500);
             }
         });
-        volTrack.addEventListener('pointerup', e => {
-            try { if (e && e.pointerId !== undefined) volTrack.releasePointerCapture(e.pointerId); } catch (_) { }
-            setTimeout(() => { isControlHubChangingVolume = false; }, 80);
-        });
-        volTrack.addEventListener('pointercancel', e => {
-            try { if (e && e.pointerId !== undefined) volTrack.releasePointerCapture(e.pointerId); } catch (_) { }
-            setTimeout(() => { isControlHubChangingVolume = false; }, 80);
-        });
+
+        const stopVolDrag = (e) => {
+            if (isDraggingVolume) {
+                try { if (e && e.pointerId !== undefined) volTrack.releasePointerCapture(e.pointerId); } catch (_) { }
+                isDraggingVolume = false;
+                volWrap.classList.remove('dragging');
+                setTimeout(() => { isControlHubChangingVolume = false; }, 80);
+                wakeUI(2500);
+            }
+        };
+        volTrack.addEventListener('pointerup', stopVolDrag);
+        volTrack.addEventListener('pointercancel', stopVolDrag);
+
+        // Mouse wheel over volume area adjusts volume by 5%
+        volWrap.addEventListener('wheel', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const step = e.deltaY < 0 ? 5 : -5;
+            const cur = isAudioMuted ? 0 : (lastVol || 100);
+            const next = Math.max(0, Math.min(100, cur + step));
+            setVolume(next);
+            triggerVolHud(next);
+            wakeUI(2500);
+        }, { passive: false });
+
         document.addEventListener('click', e => {
-            if (!volWrap.contains(e.target)) volWrap.classList.remove('open');
+            if (!volWrap.contains(e.target)) {
+                volWrap.classList.remove('open');
+                volWrap.classList.remove('touch-open');
+            }
             if (aspectWrap && !aspectWrap.contains(e.target)) aspectWrap.classList.remove('open');
             const aWrap = $('audioTrackWrap');
             if (aWrap && !aWrap.contains(e.target)) aWrap.classList.remove('open');
@@ -6089,9 +6123,9 @@
             if (isBooting || isControlHubChangingVolume) return;
             if (window.clientAudioEngine && clientAudioEngine.active) return;
             const pct = video.muted ? 0 : Math.round(video.volume * 100);
-            volFill.style.height = pct + '%';
-            volThumb.style.bottom = pct + '%';
-            volPct.textContent = pct;
+            if (volFill) volFill.style.width = pct + '%';
+            if (volThumb) volThumb.style.left = pct + '%';
+            if (volPct) volPct.textContent = pct;
             const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
             $('icoVol').innerHTML = `<path d="${p}"/>`;
             volPopIcon.innerHTML = `<path d="${p}"/>`;
@@ -9847,7 +9881,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
         let holding = false;
 
         function inControls(e) {
-            return e.target.closest('#controls, #volPop, #aspectPop, #aspectWrap, #audioTrackPop, #audioTrackWrap, #subTrackPop, #subTrackWrap, #dolbyPrompt, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky');
+            return e.target.closest('#controls, #volWrap, #volTrack, #volBtn, #volPop, #aspectPop, #aspectWrap, #audioTrackPop, #audioTrackWrap, #subTrackPop, #subTrackWrap, #dolbyPrompt, .modal-overlay, #settingsDrawer, #drawerOverlay, #centerIcon.sticky, #titleBar');
         }
         /* Capsule HUD (Top-Center Pill for Volume & Brightness) */
         let capsuleHudTimer = null;
@@ -9958,50 +9992,29 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }, 650);
         }
 
-        let isMouseOverUI = false;
         const titleBar = $('titleBar'), controls = $('controls');
 
-        function onEnterUI(e) {
-            if (e && (e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents))) return;
-            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
-            isMouseOverUI = true;
+        function isMenuOpen() {
+            return (typeof settingsDrawer !== 'undefined' && settingsDrawer && settingsDrawer.classList.contains('open')) ||
+                   (typeof aspectWrap !== 'undefined' && aspectWrap && aspectWrap.classList.contains('open')) ||
+                   ($('audioTrackWrap') && $('audioTrackWrap').classList.contains('open')) ||
+                   ($('subTrackWrap') && $('subTrackWrap').classList.contains('open')) ||
+                   ($('dolbyPrompt') && $('dolbyPrompt').classList.contains('show')) ||
+                   ($('vlcModal') && $('vlcModal').classList.contains('open'));
+        }
+
+        function wakeUI(duration = 2500) {
             stage.classList.remove('hide-ui');
             resumeLiquidGlass();
             clearTimeout(wakeUI.t);
-        }
-        function onLeaveUI(e) {
-            if (e && (e.pointerType === 'touch' || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents))) return;
-            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
-            isMouseOverUI = false;
-            wakeUI();
-        }
-
-        if (controls) {
-            controls.addEventListener('mouseenter', onEnterUI);
-            controls.addEventListener('mouseleave', onLeaveUI);
-            controls.addEventListener('pointerdown', (e) => {
-                if (e && e.pointerType === 'touch') isMouseOverUI = false;
-                wakeUI(4000);
-            });
-        }
-        if (titleBar) {
-            titleBar.addEventListener('mouseenter', onEnterUI);
-            titleBar.addEventListener('mouseleave', onLeaveUI);
-            titleBar.addEventListener('pointerdown', (e) => {
-                if (e && e.pointerType === 'touch') isMouseOverUI = false;
-                wakeUI(4000);
-            });
-        }
-
-        function wakeUI(duration = 3500) {
-            stage.classList.remove('hide-ui');
-            resumeLiquidGlass();
-            clearTimeout(wakeUI.t);
-            if (!video.paused && !isMouseOverUI) {
+            if (!video.paused) {
                 wakeUI.t = setTimeout(() => {
-                    if (!stage.classList.contains('mouse-near-bottom') && !isMouseOverUI) {
+                    if (!video.paused && !isDraggingVolume && !scrubbing && !isMenuOpen()) {
                         stage.classList.add('hide-ui');
-                        volWrap.classList.remove('open');
+                        if (volWrap) {
+                            volWrap.classList.remove('open');
+                            volWrap.classList.remove('touch-open');
+                        }
                         if (aspectWrap) aspectWrap.classList.remove('open');
                         const aWrap = $('audioTrackWrap');
                         if (aWrap) aWrap.classList.remove('open');
@@ -10012,31 +10025,41 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                 }, duration);
             }
         }
-        video.addEventListener('play', () => wakeUI(3500));
+        video.addEventListener('play', () => wakeUI(2500));
         video.addEventListener('pause', () => {
             stage.classList.remove('hide-ui');
             resumeLiquidGlass();
             clearTimeout(wakeUI.t);
         });
 
-        /* Bottom hover / mouse movement triggers top and bottom UI (Desktop only) */
+        /* YouTube controllability: clicking or touching controls/header wakes UI and auto-hides after duration */
+        if (controls) {
+            controls.addEventListener('pointerdown', () => wakeUI(2500));
+            controls.addEventListener('click', () => wakeUI(2500));
+        }
+        if (titleBar) {
+            titleBar.addEventListener('pointerdown', () => wakeUI(2500));
+            titleBar.addEventListener('click', () => wakeUI(2500));
+        }
+
+        /* YouTube-style cursor wake: moving mouse wakes UI and resets 2.5s auto-hide countdown */
         stage.addEventListener('mousemove', e => {
-            // Ignore touch devices and synthetic mouse events
             if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
             if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
-
-            const nearBottom = (window.innerHeight - e.clientY) <= Math.max(160, window.innerHeight * 0.25);
-            if (nearBottom) {
-                stage.classList.add('mouse-near-bottom');
-                stage.classList.remove('hide-ui');
-            } else {
-                stage.classList.remove('mouse-near-bottom');
-            }
-            wakeUI();
+            wakeUI(2500);
         });
+
+        /* Mouse leaving video stage schedules auto-hide */
         stage.addEventListener('mouseleave', () => {
-            stage.classList.remove('mouse-near-bottom');
-            isMouseOverUI = false;
+            if (!video.paused && !isDraggingVolume && !scrubbing && !isMenuOpen()) {
+                clearTimeout(wakeUI.t);
+                wakeUI.t = setTimeout(() => {
+                    if (!video.paused && !isDraggingVolume && !scrubbing && !isMenuOpen()) {
+                        stage.classList.add('hide-ui');
+                        pauseLiquidGlass();
+                    }
+                }, 800);
+            }
         });
 
         /* Prevent native context menu on long press (prevents "Download video" dialog on mobile) */
@@ -10060,17 +10083,15 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             if (inControls(e) || (landingScreen && landingScreen.classList.contains('show'))) return;
             const uiWasHidden = stage.classList.contains('hide-ui');
             const tapSide = e.clientX < (window.innerWidth / 2) ? 'L' : 'R';
+            const isTouch = (e && e.pointerType === 'touch') || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
-            // Cancel any pending single-tap action IMMEDIATELY if this new touch
-            // lands within the double-tap window on the same side or active seek side!
             const now = Date.now();
             const timeSinceLast = now - lastTapTime;
             const isSeekingSide = seekFxState[tapSide].total > 0;
-            const isDoubleTapCandidate = (timeSinceLast < 450 && lastTapSide === tapSide) || isSeekingSide;
+            const isDoubleTapCandidate = isTouch && ((timeSinceLast < 450 && lastTapSide === tapSide) || isSeekingSide);
             if (tapTimer && isDoubleTapCandidate) {
                 clearTimeout(tapTimer);
                 tapTimer = null;
-                // If UI was hidden, keep it hidden during double-tap seek
                 if (uiWasHidden) {
                     stage.classList.add('hide-ui');
                     clearTimeout(wakeUI.t);
@@ -10085,7 +10106,8 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                 startBri: fx.bri,
                 moved: false,
                 pointerId: e.pointerId,
-                uiWasHidden: uiWasHidden
+                uiWasHidden: uiWasHidden,
+                isTouch: isTouch
             };
             g.holdTimer = setTimeout(() => {
                 if (g && !g.moved && !g.mode) {
@@ -10137,7 +10159,6 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                     video.playbackRate = normalSpeed;
                     speedBadge.classList.remove('show');
                 }
-                /* hold-from-paused keeps playing after release */
             }
             if (g.mode) {
                 hideHud();
@@ -10147,8 +10168,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }
 
             const dt = Date.now() - g.t0;
-            const isTouch = (e && e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
-            // Allow natural finger movement on touchscreens (40px) vs mouse click (16px)
+            const isTouch = g.isTouch || (e && e.pointerType === 'touch') || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
             const maxMove = isTouch ? 40 : 16;
             const curX = (e && typeof e.clientX === 'number' && e.clientX !== 0) ? e.clientX : g.x0;
             const curY = (e && typeof e.clientY === 'number' && e.clientY !== 0) ? e.clientY : g.y0;
@@ -10156,52 +10176,53 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
 
             if (!movedFar && dt < HOLD_MS) {             /* tap / double-tap */
                 const now = Date.now();
-                const timeSinceLast = g.t0 - lastTapTime;
-                const isSeekingSide = seekFxState[g.side].total > 0;
-                const isDoubleTap = (timeSinceLast < 450 && lastTapSide === g.side) || isSeekingSide;
-
-                if (isDoubleTap) {
-                    /* every tap within the window while a tap-chain is running
-                       seeks again — tap storms accumulate: ±10s each */
-                    clearTimeout(tapTimer);
-                    tapTimer = null;
-                    lastTapTime = now;
-                    lastTapSide = g.side;
-                    // Keep controls UI hidden so double-tap seek does not pop up the screen controls
-                    if (g.uiWasHidden) {
-                        stage.classList.add('hide-ui');
-                        clearTimeout(wakeUI.t);
-                    }
-                    seekFx(g.side);
+                if (!isTouch) {
+                    /* Desktop YouTube behavior: instant click-to-pause with zero latency */
+                    wakeUI(2500);
+                    togglePlay();
                 } else {
-                    lastTapTime = now;
-                    lastTapSide = g.side;
-                    const tapWasHidden = g.uiWasHidden;
-                    clearTimeout(tapTimer);
-                    tapTimer = setTimeout(() => {
+                    const timeSinceLast = g.t0 - lastTapTime;
+                    const isSeekingSide = seekFxState[g.side].total > 0;
+                    const isDoubleTap = (timeSinceLast < 450 && lastTapSide === g.side) || isSeekingSide;
+
+                    if (isDoubleTap) {
+                        clearTimeout(tapTimer);
                         tapTimer = null;
-                        if (isTouch) {
-                            /* Mobile / touch: single tap toggles UI cleanly without pausing */
+                        lastTapTime = now;
+                        lastTapSide = g.side;
+                        if (g.uiWasHidden) {
+                            stage.classList.add('hide-ui');
+                            clearTimeout(wakeUI.t);
+                        }
+                        seekFx(g.side);
+                    } else {
+                        lastTapTime = now;
+                        lastTapSide = g.side;
+                        const tapWasHidden = g.uiWasHidden;
+                        clearTimeout(tapTimer);
+                        tapTimer = setTimeout(() => {
+                            tapTimer = null;
                             if (tapWasHidden) {
-                                /* Tap to wake: show UI and keep it visible for 3.5s */
                                 wakeUI(3500);
                             } else {
-                                /* Tap to hide: dismiss immediately */
                                 stage.classList.add('hide-ui');
                                 clearTimeout(wakeUI.t);
                                 pauseLiquidGlass();
                             }
-                        } else {
-                            /* Desktop mouse click: wakes UI and toggles play/pause */
-                            wakeUI(3500);
-                            togglePlay();
-                        }
-                    }, 350);
+                        }, 350);
+                    }
                 }
             }
             try { if (g && g.pointerId !== undefined) stage.releasePointerCapture(g.pointerId); } catch (_) { }
             g = null;
         }
+
+        /* YouTube-style double-click canvas to toggle fullscreen (desktop only) */
+        stage.addEventListener('dblclick', e => {
+            if (inControls(e)) return;
+            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+            toggleFullscreen();
+        });
         stage.addEventListener('pointerup', endGesture);
         stage.addEventListener('pointercancel', e => {
             if (g) {
