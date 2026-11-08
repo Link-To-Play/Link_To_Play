@@ -351,7 +351,7 @@
 
         #stage.hide-ui canvas[data-liquid-ignore] {
             opacity: 0 !important;
-            pointer-events: none !important;
+            pointer-events: none;
         }
 
         #stage.hide-ui {
@@ -361,7 +361,7 @@
         #stage.hide-ui #controls,
         #stage.hide-ui #titleBar {
             opacity: 0 !important;
-            pointer-events: none !important;
+            pointer-events: none;
         }
 
         #stage.hide-ui #controls {
@@ -372,15 +372,12 @@
             transform: translateY(-8px) !important;
         }
 
-        /* Hovering controls/title appears smoothly on mouse devices only */
-        @media (hover: hover) and (pointer: fine) {
-
-            #stage:not(.hide-ui) #controls:hover,
-            #stage:not(.hide-ui) #titleBar:hover {
-                opacity: 1 !important;
-                pointer-events: auto !important;
-                transform: translateY(0) scale(1) !important;
-            }
+        /* Hovering controls/title appears smoothly on mouse devices */
+        #stage #controls:hover,
+        #stage #titleBar:hover {
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            transform: translateY(0) scale(1) !important;
         }
 
         .ctl-btn {
@@ -10147,8 +10144,9 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
 
         /* YouTube-style cursor wake: moving mouse wakes UI and resets 2.5s auto-hide countdown */
         stage.addEventListener('mousemove', e => {
-            if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return;
-            if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return;
+            wakeUI(2500);
+        });
+        window.addEventListener('mousemove', e => {
             wakeUI(2500);
         });
 
@@ -10186,7 +10184,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             if (inControls(e) || (landingScreen && landingScreen.classList.contains('show'))) return;
             const uiWasHidden = stage.classList.contains('hide-ui');
             const tapSide = e.clientX < (window.innerWidth / 2) ? 'L' : 'R';
-            const isTouch = (e && e.pointerType === 'touch') || (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+            const isTouch = (e && e.pointerType === 'touch');
 
             const now = Date.now();
             const timeSinceLast = now - lastTapTime;
@@ -10271,7 +10269,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }
 
             const dt = Date.now() - g.t0;
-            const isTouch = g.isTouch || (e && e.pointerType === 'touch') || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+            const isTouch = g.isTouch || (e && e.pointerType === 'touch');
             const maxMove = isTouch ? 40 : 16;
             const curX = (e && typeof e.clientX === 'number' && e.clientX !== 0) ? e.clientX : g.x0;
             const curY = (e && typeof e.clientY === 'number' && e.clientY !== 0) ? e.clientY : g.y0;
@@ -10683,6 +10681,22 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                         clientAudioEngine.setTracks(event.data.audioTracks);
                     }
                 }
+            } else if (event.data.type === 'KEY_DOWN') {
+                wakeUI(2500);
+                document.dispatchEvent(new KeyboardEvent('keydown', {
+                    code: event.data.code,
+                    key: event.data.key,
+                    repeat: Boolean(event.data.repeat),
+                    bubbles: true,
+                    cancelable: true
+                }));
+            } else if (event.data.type === 'KEY_UP') {
+                document.dispatchEvent(new KeyboardEvent('keyup', {
+                    code: event.data.code,
+                    key: event.data.key,
+                    bubbles: true,
+                    cancelable: true
+                }));
             }
         });
 
