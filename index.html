@@ -7034,24 +7034,14 @@
                 }
             },
 
-            async startDecodeLoop(startTime, autoPlayOnFirstSample = false) {
+            async startDecodeLoop(startTime) {
                 if (!this.audioSink || !this.audioCtx) return;
+                if (video.paused) { this.decodeGeneration++; return; }
                 const currentGen = ++this.decodeGeneration;
                 this.nextScheduledTime = 0;
                 this.lastSampleEndPTS = -1;
                 this.currentSteeredRate = video.playbackRate || 1;
-
-                let isFirstSample = true;
-                let fallbackTimer = null;
-                if (autoPlayOnFirstSample) {
-                    fallbackTimer = setTimeout(() => {
-                        if (currentGen === this.decodeGeneration && autoPlayOnFirstSample && video.paused) {
-                            hideSpinner(true);
-                            video.play().catch(() => {});
-                            this.startSyncMonitoring();
-                        }
-                    }, 2500);
-                }
+                this._severeDriftCount = 0;
 
                 try {
                     for await (const sample of this.audioSink.samples(startTime)) {
@@ -7060,16 +7050,12 @@
                             break;
                         }
 
-                        if (isFirstSample) {
-                            isFirstSample = false;
-                            if (fallbackTimer) clearTimeout(fallbackTimer);
-                            if (autoPlayOnFirstSample) {
-                                try {
-                                    video.currentTime = sample.timestamp;
-                                } catch (e) { }
-                                hideSpinner(true);
-                                video.play().catch(() => { });
-                                this.startSyncMonitoring();
+                        // On stream startup or after seek: drop any decoded samples that ended before current video playback position
+                        if (this.lastSampleEndPTS < 0) {
+                            const vNow = video.currentTime || 0;
+                            if (sample.timestamp + sample.duration < vNow) {
+                                try { sample.close(); } catch (e) { }
+                                continue;
                             }
                         }
 
@@ -7091,7 +7077,6 @@
                         this.scheduleSample(sample);
                     }
                 } catch (iterErr) {
-                    if (fallbackTimer) clearTimeout(fallbackTimer);
                     if (currentGen === this.decodeGeneration) {
                         console.warn('[AudioEngine] Decode stream error:', iterErr);
                         this._decodeRetries = (this._decodeRetries || 0) + 1;
@@ -7100,7 +7085,7 @@
                             setTimeout(() => {
                                 if (this.active && currentGen === this.decodeGeneration && !video.paused) {
                                     this.stopAllScheduledNodes(true);
-                                    this.startDecodeLoop(video.currentTime || 0, autoPlayOnFirstSample);
+                                    this.startDecodeLoop(video.currentTime || 0);
                                 }
                             }, 800 * this._decodeRetries);
                         } else {
@@ -7128,29 +7113,23 @@
                     const activeRate = this.currentSteeredRate || vRate;
                     const nowAudio = this.audioCtx.currentTime;
 
-                    // If sample is from before seek target by more than 150ms, discard it
-                    if (samplePTS + sampleDur < vCurrent - 0.15) {
-                        sample.close();
-                        return;
-                    }
-
                     let startAudioTime = 0;
                     let offset = 0;
 
-                    const isContiguous = (this.lastSampleEndPTS >= 0) && Math.abs(samplePTS - this.lastSampleEndPTS) < 0.01;
+                    const isContiguous = (this.lastSampleEndPTS >= 0) && Math.abs(samplePTS - this.lastSampleEndPTS) < 0.015;
 
                     if (isContiguous && this.nextScheduledTime > nowAudio) {
                         startAudioTime = this.nextScheduledTime;
                         offset = 0;
                     } else {
-                        // Start of stream or after seek:
-                        const timeDelta = (samplePTS - vCurrent) / vRate;
+                        // Start of stream, after seek, or audio underrun:
+                        const timeDelta = (samplePTS - vCurrent) / activeRate;
                         if (timeDelta >= 0) {
                             startAudioTime = nowAudio + timeDelta;
                             offset = 0;
                         } else {
                             startAudioTime = nowAudio;
-                            offset = Math.min(sampleDur - 0.001, Math.max(0, vCurrent - samplePTS));
+                            offset = Math.max(0, Math.min(sampleDur - 0.001, vCurrent - samplePTS));
                         }
                     }
 
@@ -7252,7 +7231,8 @@
                 }
                 this.stopAllScheduledNodes(true);
                 this.currentSteeredRate = video.playbackRate || 1;
-                this.startDecodeLoop(video.currentTime || 0, false);
+                this._lastSeekTime = Date.now();
+                this.startDecodeLoop(video.currentTime || 0);
                 this.startSyncMonitoring();
             },
 
@@ -7268,25 +7248,17 @@
                 this.decodeGeneration++;
                 this.stopSyncMonitoring();
                 this.stopAllScheduledNodes(true);
-                if (!video.paused && !video.ended) {
-                    this._wasPlayingBeforeSeek = true;
-                }
             },
 
             onSeeked() {
                 if (!this.active) return;
                 this.stopAllScheduledNodes(true);
                 this.currentSteeredRate = video.playbackRate || 1;
-                const seekTarget = video.currentTime || 0;
-                const shouldResume = this._wasPlayingBeforeSeek || !video.paused;
-                this._wasPlayingBeforeSeek = false;
-
-                if (shouldResume) {
-                    video.pause();
-                    showSpinner();
-                    this.startDecodeLoop(seekTarget, true);
-                } else {
-                    this.startDecodeLoop(seekTarget, false);
+                this._lastSeekTime = Date.now();
+                this._severeDriftCount = 0;
+                if (!video.paused) {
+                    this.startDecodeLoop(video.currentTime || 0);
+                    this.startSyncMonitoring();
                 }
             },
 
@@ -7300,6 +7272,8 @@
             onWaiting() {
                 if (!this.active) return;
                 this.stopSyncMonitoring();
+                this.stopAllScheduledNodes(true);
+                this.decodeGeneration++;
             },
 
             onPlaying() {
@@ -7309,6 +7283,9 @@
                         this.audioCtx.resume();
                     }
                 } catch (e) { }
+                this._lastSeekTime = Date.now();
+                this.stopAllScheduledNodes(true);
+                this.startDecodeLoop(video.currentTime || 0);
                 this.startSyncMonitoring();
                 this.checkSync();
             },
@@ -7346,31 +7323,52 @@
                     const audiblePTS = activeNode.samplePTS + (activeNode.offset || 0) + (elapsed * nodeRate);
                     const drift = audiblePTS - vCurrent; // positive = audio ahead, negative = audio delayed
 
-                    if (Math.abs(drift) <= 0.020) {
+                    if (Math.abs(drift) <= 0.025) {
                         if (this.currentSteeredRate !== vRate) {
                             this.setNodesPlaybackRate(vRate);
                         }
-                    } else if (drift < -0.020 && drift >= -0.100) {
-                        // Audio is delayed 20-100ms: steer +1.5% faster
-                        const steered = vRate * 1.015;
+                        this._severeDriftCount = 0;
+                    } else if (drift < -0.025 && drift >= -0.150) {
+                        // Audio is delayed 25-150ms: steer +2.5% faster
+                        const steered = vRate * 1.025;
                         if (this.currentSteeredRate !== steered) {
                             this.setNodesPlaybackRate(steered);
                         }
-                    } else if (drift > 0.020 && drift <= 0.100) {
-                        // Audio is leading 20-100ms: steer -1.5% slower
-                        const steered = vRate * 0.985;
+                        this._severeDriftCount = 0;
+                    } else if (drift > 0.025 && drift <= 0.150) {
+                        // Audio is leading 25-150ms: steer -2.5% slower
+                        const steered = vRate * 0.975;
                         if (this.currentSteeredRate !== steered) {
                             this.setNodesPlaybackRate(steered);
                         }
-                    } else if (Math.abs(drift) > 0.100) {
-                        if (Math.abs(drift) > 0.350) {
-                            console.log('[AudioEngine] Severe drift detected:', drift.toFixed(3), 's. Resyncing...');
-                            this.stopAllScheduledNodes(true);
-                            this.startDecodeLoop(vCurrent, false);
-                        } else if (drift < 0) {
-                            this.setNodesPlaybackRate(vRate * 1.03);
+                        this._severeDriftCount = 0;
+                    } else if (drift < -0.150 && drift >= -0.600) {
+                        // Audio delayed 150-600ms: steer +5.0% faster
+                        const steered = vRate * 1.050;
+                        if (this.currentSteeredRate !== steered) {
+                            this.setNodesPlaybackRate(steered);
+                        }
+                        this._severeDriftCount = 0;
+                    } else if (drift > 0.150 && drift <= 0.600) {
+                        // Audio leading 150-600ms: steer -5.0% slower
+                        const steered = vRate * 0.950;
+                        if (this.currentSteeredRate !== steered) {
+                            this.setNodesPlaybackRate(steered);
+                        }
+                        this._severeDriftCount = 0;
+                    } else {
+                        // Math.abs(drift) > 0.600: only resync if persistent over multiple seconds and not right after seek
+                        const timeSinceSeek = Date.now() - (this._lastSeekTime || 0);
+                        if (timeSinceSeek > 2500) {
+                            this._severeDriftCount = (this._severeDriftCount || 0) + 1;
+                            if (this._severeDriftCount > 30) {
+                                console.log('[AudioEngine] Persistent severe drift detected:', drift.toFixed(3), 's. Resyncing...');
+                                this._severeDriftCount = 0;
+                                this.stopAllScheduledNodes(true);
+                                this.startDecodeLoop(vCurrent);
+                            }
                         } else {
-                            this.setNodesPlaybackRate(vRate * 0.97);
+                            this.setNodesPlaybackRate(drift < 0 ? (vRate * 1.05) : (vRate * 0.95));
                         }
                     }
                 }
