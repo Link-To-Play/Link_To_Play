@@ -654,17 +654,17 @@
 
         #volPop {
             position: absolute;
-            bottom: 56px;
+            bottom: calc(100% + 10px);
             left: 50%;
-            transform: translateX(-50%) translateY(8px) scale(0.92);
+            transform: translateX(-50%) translateY(6px) scale(0.94);
             transform-origin: bottom center;
-            background: rgba(18, 18, 26, 0.88);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            background: rgba(18, 18, 26, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.2);
             backdrop-filter: blur(28px) saturate(160%);
             -webkit-backdrop-filter: blur(28px) saturate(160%);
             box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 1px 1px rgba(255, 255, 255, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.25);
             border-radius: 24px;
-            padding: 14px 12px;
+            padding: 14px 14px;
             opacity: 0;
             visibility: hidden;
             pointer-events: none;
@@ -676,20 +676,23 @@
             z-index: 50;
         }
 
-        /* Bridge the gap between #volBtn and #volPop so mouse moving between them never drops hover */
+        /* Large seamless hit-test bridge around popup and button so hover NEVER drops */
         #volPop::after {
             content: '';
             position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            height: 18px;
+            top: -12px;
+            bottom: -24px;
+            left: -24px;
+            right: -24px;
+            pointer-events: auto;
+            z-index: -1;
         }
 
-        /* Hover on desktop opens the vertical popup smoothly */
+        /* Hover or .open on desktop displays the vertical popup smoothly */
         @media (hover: hover) and (pointer: fine) {
             #volWrap:hover #volPop,
-            #volWrap.dragging #volPop {
+            #volWrap.dragging #volPop,
+            #volWrap.open #volPop {
                 opacity: 1;
                 visibility: visible;
                 transform: translateX(-50%) translateY(0) scale(1);
@@ -6090,6 +6093,31 @@
             }
         }
 
+        let volCloseTimer = null;
+        let isHoveringVol = false;
+
+        function openVolPop() {
+            clearTimeout(volCloseTimer);
+            isHoveringVol = true;
+            volWrap.classList.add('open');
+            wakeUI(4000);
+        }
+
+        function scheduleCloseVolPop() {
+            isHoveringVol = false;
+            clearTimeout(volCloseTimer);
+            if (!isDraggingVolume) {
+                volCloseTimer = setTimeout(() => {
+                    if (!isHoveringVol && !isDraggingVolume) {
+                        volWrap.classList.remove('open');
+                    }
+                }, 400); // 400ms grace period ensures accidental edge cursor jitter doesn't close it
+            }
+        }
+
+        volWrap.addEventListener('mouseenter', openVolPop);
+        volWrap.addEventListener('mouseleave', scheduleCloseVolPop);
+
         volBtn.addEventListener('click', e => {
             e.stopPropagation();
             const isTouch = (e && e.pointerType === 'touch') || ('ontouchstart' in window) || (window.innerWidth <= 768);
@@ -6097,15 +6125,17 @@
                 volWrap.classList.toggle('open');
             } else {
                 toggleMute();
+                openVolPop();
             }
-            wakeUI(2500);
+            wakeUI(3000);
         });
 
         if (volPopIcon) {
             volPopIcon.addEventListener('click', e => {
                 e.stopPropagation();
                 toggleMute();
-                wakeUI(2500);
+                openVolPop();
+                wakeUI(3000);
             });
         }
 
@@ -6125,10 +6155,11 @@
             isDraggingVolume = true;
             isControlHubChangingVolume = true;
             volWrap.classList.add('dragging');
+            volWrap.classList.add('open');
             const v = volFromVerticalEvent(e);
             setVolume(v);
             triggerVolHud(v);
-            wakeUI(2500);
+            wakeUI(4000);
         });
 
         volTrack.addEventListener('pointermove', e => {
@@ -6136,7 +6167,7 @@
                 const v = volFromVerticalEvent(e);
                 setVolume(v);
                 triggerVolHud(v);
-                wakeUI(2500);
+                wakeUI(4000);
             }
         });
 
@@ -6146,6 +6177,7 @@
                 isDraggingVolume = false;
                 volWrap.classList.remove('dragging');
                 setTimeout(() => { isControlHubChangingVolume = false; }, 80);
+                scheduleCloseVolPop();
                 wakeUI(2500);
             }
         };
@@ -10066,7 +10098,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
         const titleBar = $('titleBar'), controls = $('controls');
 
         function isMenuOpen() {
-            return (typeof volWrap !== 'undefined' && volWrap && volWrap.classList.contains('open')) ||
+            return (typeof volWrap !== 'undefined' && volWrap && (volWrap.classList.contains('open') || isHoveringVol || isDraggingVolume)) ||
                    (typeof settingsDrawer !== 'undefined' && settingsDrawer && settingsDrawer.classList.contains('open')) ||
                    (typeof aspectWrap !== 'undefined' && aspectWrap && aspectWrap.classList.contains('open')) ||
                    ($('audioTrackWrap') && $('audioTrackWrap').classList.contains('open')) ||
@@ -10081,9 +10113,9 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             clearTimeout(wakeUI.t);
             if (!video.paused) {
                 wakeUI.t = setTimeout(() => {
-                    if (!video.paused && !isDraggingVolume && !scrubbing && !isMenuOpen()) {
+                    if (!video.paused && !isDraggingVolume && !isHoveringVol && !scrubbing && !isMenuOpen()) {
                         stage.classList.add('hide-ui');
-                        if (volWrap) {
+                        if (volWrap && !isHoveringVol && !isDraggingVolume) {
                             volWrap.classList.remove('open');
                             volWrap.classList.remove('touch-open');
                         }
@@ -10331,6 +10363,18 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
            Space press  → play/pause toggle
            Space hold   → play (paused) or 2× boost (playing), release restores */
         let spaceHeld = false, spaceTimer = null;
+
+        function getCurrentVolume() {
+            if (isAudioMuted) return 0;
+            if (window.clientAudioEngine && clientAudioEngine.active) {
+                return (typeof lastVol === 'number') ? lastVol : 100;
+            }
+            if (window.isSecondaryAudioActive && window.secondaryAudio) {
+                return secondaryAudio.muted ? 0 : Math.round(secondaryAudio.volume * 100);
+            }
+            return video.muted ? 0 : Math.round(video.volume * 100);
+        }
+
         document.addEventListener('keydown', e => {
             if (e.target && e.target.tagName === 'INPUT' && e.target.offsetParent !== null) return;
             if (e.code === 'Space') {
@@ -10358,7 +10402,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }
             else if (e.code === 'ArrowUp' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+                const current = getCurrentVolume();
                 const next = Math.min(100, current + 5);
                 setVolume(next);
                 triggerVolHud(next);
@@ -10366,7 +10410,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }
             else if (e.code === 'ArrowDown' || e.key === 'ArrowDown') {
                 e.preventDefault();
-                const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+                const current = getCurrentVolume();
                 const next = Math.max(0, current - 5);
                 setVolume(next);
                 triggerVolHud(next);
@@ -10374,7 +10418,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }
             else if (e.code === 'AudioVolumeUp' || e.key === 'AudioVolumeUp') {
                 e.preventDefault();
-                const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+                const current = getCurrentVolume();
                 const next = Math.min(100, current + 5);
                 setVolume(next);
                 triggerVolHud(next);
@@ -10382,15 +10426,15 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             }
             else if (e.code === 'AudioVolumeDown' || e.key === 'AudioVolumeDown') {
                 e.preventDefault();
-                const current = (video.muted || video.volume === 0) ? 0 : Math.round(video.volume * 100);
+                const current = getCurrentVolume();
                 const next = Math.max(0, current - 5);
                 setVolume(next);
                 triggerVolHud(next);
                 return;
             }
             else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.code === 'AudioVolumeMute' || e.key === 'AudioVolumeMute') {
-                const isCurrentlyMuted = isAudioMuted || (window.isSecondaryAudioActive && window.secondaryAudio ? (secondaryAudio.muted || secondaryAudio.volume === 0) : (window.clientAudioEngine && clientAudioEngine.active ? isAudioMuted : (video.muted || video.volume === 0)));
-                const next = isCurrentlyMuted ? (lastVol || 100) : 0;
+                const current = getCurrentVolume();
+                const next = (current > 0) ? 0 : (lastVol || 100);
                 setVolume(next);
                 triggerVolHud(next);
                 return; // Mute toggle ONLY shows volume capsule, does not wake UI
