@@ -6749,6 +6749,8 @@
 
             async selectTrack(index) {
                 if (index < 0 || index >= this.audioTracks.length) return;
+                if (this.active && this.selectedTrackIndex === index && this.audioSink) return;
+                if (this.loading && this.selectedTrackIndex === index) return;
                 this.selectedTrackIndex = index;
                 mediaFileInfo.activeAudioIndex = index;
                 const track = this.audioTracks[index];
@@ -6801,26 +6803,36 @@
                     const modules = await loadDecoderModules();
                     const { mediabunny } = modules;
 
-                    if (!this.mediabunnyInput || this.currentSourceUrl !== streamUrl) {
+                    if (!this._tracksPromise || this.currentSourceUrl !== streamUrl) {
                         this.currentSourceUrl = streamUrl;
-                        let srcUrl = streamUrl;
-                        if (srcUrl.includes('/api/proxy?url=')) {
-                            try {
-                                const m = srcUrl.match(/[?&]url=([^&]+)/);
-                                if (m && m[1]) srcUrl = decodeURIComponent(m[1]);
-                            } catch (e) { }
-                        }
+                        this._tracksPromise = (async () => {
+                            let srcUrl = streamUrl;
+                            if (srcUrl.includes('/api/proxy?url=')) {
+                                try {
+                                    const m = srcUrl.match(/[?&]url=([^&]+)/);
+                                    if (m && m[1]) srcUrl = decodeURIComponent(m[1]);
+                                } catch (e) { }
+                            }
 
-                        const source = this.makeUrlSource(mediabunny, srcUrl);
-                        this.mediabunnyInput = new mediabunny.Input({
-                            source,
-                            formats: mediabunny.ALL_FORMATS
-                        });
-                        this.mediabunnyTracks = await this.mediabunnyInput.getAudioTracks();
+                            const source = this.makeUrlSource(mediabunny, srcUrl);
+                            this.mediabunnyInput = new mediabunny.Input({
+                                source,
+                                formats: mediabunny.ALL_FORMATS
+                            });
+                            const tks = await this.mediabunnyInput.getAudioTracks();
+                            console.log(`[AudioEngine] Demuxer discovered ${tks.length} audio track(s).`);
+                            return tks;
+                        })();
                     }
 
-                    const mbTrack = this.mediabunnyTracks[index] || this.mediabunnyTracks.find(t => t.id === track.streamIndex) || this.mediabunnyTracks[0];
-                    if (!mbTrack) throw new Error('No audio track available in demuxer');
+                    this.mediabunnyTracks = await this._tracksPromise;
+
+                    const mbTrack = (this.mediabunnyTracks && this.mediabunnyTracks.length > 0)
+                        ? (this.mediabunnyTracks[index] || this.mediabunnyTracks.find(t => t.id === track.streamIndex) || this.mediabunnyTracks[0])
+                        : null;
+                    if (!mbTrack) {
+                        throw new Error('No audio track available in demuxer (demuxer returned ' + (this.mediabunnyTracks ? this.mediabunnyTracks.length : 0) + ' tracks)');
+                    }
 
                     if (typeof mbTrack.canDecode === 'function' && !(await mbTrack.canDecode())) {
                         throw new Error('Decoder not available for codec: ' + mbTrack.codec);
@@ -7081,11 +7093,13 @@
 
             reset() {
                 this.active = false;
+                this.loading = false;
                 this.selectedTrackIndex = 0;
                 this.decodeGeneration++;
-                this.stopAllScheduledNodes();
+                this.stopAllScheduledNodes(true);
                 this.audioSink = null;
                 this.mediabunnyInput = null;
+                this._tracksPromise = null;
                 this.mediabunnyTracks = [];
                 this.currentSourceUrl = '';
                 const btn = $('audioTrackBtn');
@@ -7095,8 +7109,9 @@
 
             deactivate() {
                 this.active = false;
+                this.loading = false;
                 this.decodeGeneration++;
-                this.stopAllScheduledNodes();
+                this.stopAllScheduledNodes(true);
                 this.audioSink = null;
 
                 const btn = $('audioTrackBtn');
