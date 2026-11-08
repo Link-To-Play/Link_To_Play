@@ -6930,7 +6930,12 @@
                     const source = this.audioCtx.createBufferSource();
                     source.buffer = audioBuffer;
                     source.playbackRate.value = vRate;
-                    source.connect(this.masterGain);
+
+                    // Micro-gain node for equal-power crossfading and DC click elimination
+                    const gainNode = this.audioCtx.createGain();
+                    gainNode.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
+                    source.connect(gainNode);
+                    gainNode.connect(this.masterGain);
 
                     const nowAudio = this.audioCtx.currentTime;
                     let startAudioTime = 0;
@@ -6955,6 +6960,7 @@
 
                     const nodeItem = {
                         node: source,
+                        gainNode: gainNode,
                         startAudioTime,
                         endAudioTime: this.nextScheduledTime,
                         samplePTS,
@@ -6964,7 +6970,10 @@
 
                     source.onended = () => {
                         this.activeNodes.delete(nodeItem);
-                        try { source.disconnect(); } catch (e) { }
+                        try {
+                            source.disconnect();
+                            gainNode.disconnect();
+                        } catch (e) { }
                     };
                 } catch (e) {
                     console.warn('[AudioEngine] Schedule error:', e);
@@ -6972,11 +6981,28 @@
                 }
             },
 
-            stopAllScheduledNodes() {
+            stopAllScheduledNodes(immediate = false) {
+                const now = (this.audioCtx && this.audioCtx.state === 'running') ? this.audioCtx.currentTime : 0;
+                const fadeDuration = immediate ? 0 : 0.025; // 25ms equal-power micro-crossfade eliminates DC clicks/pops
                 for (const item of this.activeNodes) {
                     try {
-                        item.node.stop();
-                        item.node.disconnect();
+                        if (fadeDuration > 0 && item.gainNode && this.audioCtx && this.audioCtx.state === 'running') {
+                            const currentGain = item.gainNode.gain.value;
+                            item.gainNode.gain.cancelScheduledValues(now);
+                            item.gainNode.gain.setValueAtTime(currentGain, now);
+                            item.gainNode.gain.linearRampToValueAtTime(0.0001, now + fadeDuration);
+                            item.node.stop(now + fadeDuration);
+                            setTimeout(() => {
+                                try {
+                                    item.node.disconnect();
+                                    item.gainNode.disconnect();
+                                } catch (e) { }
+                            }, Math.ceil(fadeDuration * 1000) + 30);
+                        } else {
+                            item.node.stop();
+                            item.node.disconnect();
+                            if (item.gainNode) item.gainNode.disconnect();
+                        }
                     } catch (e) { }
                 }
                 this.activeNodes.clear();
@@ -7315,11 +7341,7 @@
             if (linkHash) u.searchParams.set('hash', linkHash);
             const ssVal = (ss !== undefined && ss !== null) ? Math.floor(ss) : 0;
             u.searchParams.set('ss', String(ssVal));
-            let finalUrl = u.toString();
-            if (typeof getEffectiveStreamUrl === 'function') {
-                finalUrl = getEffectiveStreamUrl(finalUrl);
-            }
-            return finalUrl;
+            return u.toString();
         }
 
         let activeAudio = null;
@@ -7528,12 +7550,15 @@
         let activeSubtitleStreamIdx = null;
         let activeBitmapSubIdx = null;
         let subTimer = null;
+        let subFrameCallbackId = null;
+        let subRafId = null;
         let currentCueText = '';
         let subtitleSyncOffset = 0.0;
         let subtitleWindowStart = {};
         let activeSubtitleAbortController = null;
         let subSeekDebounce = null;
         let subtitleStreamingActive = {};
+        let subtitleFullyLoaded = {};
 
         function isBitmapSubtitle(sub) {
             if (!sub) return false;
@@ -7689,7 +7714,31 @@
             return overlay;
         }
 
-        function paintCue() {
+        function findActiveCues(cues, t) {
+            if (!cues || cues.length === 0) return [];
+            let low = 0, high = cues.length - 1;
+            let startIdx = 0;
+            while (low <= high) {
+                const mid = (low + high) >> 1;
+                if (cues[mid].e >= t) {
+                    startIdx = mid;
+                    high = mid - 1;
+                } else {
+                    low = mid + 1;
+                }
+            }
+            const active = [];
+            for (let i = startIdx; i < cues.length; i++) {
+                const c = cues[i];
+                if (c.s - t > 15) break;
+                if (t >= c.s && t <= c.e) {
+                    active.push(c.t);
+                }
+            }
+            return active;
+        }
+
+        function paintCue(currentTime) {
             if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) {
                 stopSubs();
                 return;
@@ -7704,14 +7753,9 @@
                 return;
             }
 
-            const t = (video.currentTime || 0) + subtitleSyncOffset;
-            const activeCues = [];
-            for (let i = 0; i < cues.length; i++) {
-                const c = cues[i];
-                if (t >= c.s && t <= c.e) {
-                    activeCues.push(c.t);
-                }
-            }
+            const mediaTime = (typeof currentTime === 'number' && isFinite(currentTime)) ? currentTime : (video ? (video.currentTime || 0) : 0);
+            const t = mediaTime + subtitleSyncOffset;
+            const activeCues = findActiveCues(cues, t);
 
             const joinedText = activeCues.join('\n');
             if (joinedText === currentCueText) return;
@@ -7726,9 +7770,48 @@
             }
         }
 
+        function startSubtitleFrameLoop() {
+            stopSubtitleFrameLoop();
+            if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null || !video) return;
+
+            if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+                const onFrame = (now, metadata) => {
+                    if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) return;
+                    paintCue(metadata ? metadata.mediaTime : video.currentTime);
+                    if (!video.paused && !video.ended) {
+                        subFrameCallbackId = video.requestVideoFrameCallback(onFrame);
+                    }
+                };
+                subFrameCallbackId = video.requestVideoFrameCallback(onFrame);
+            } else {
+                const onRaf = () => {
+                    if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) return;
+                    paintCue(video.currentTime);
+                    if (!video.paused && !video.ended) {
+                        subRafId = requestAnimationFrame(onRaf);
+                    }
+                };
+                subRafId = requestAnimationFrame(onRaf);
+            }
+        }
+
+        function stopSubtitleFrameLoop() {
+            if (subFrameCallbackId !== null && video && 'cancelVideoFrameCallback' in video) {
+                try { video.cancelVideoFrameCallback(subFrameCallbackId); } catch (e) { }
+                subFrameCallbackId = null;
+            }
+            if (subRafId !== null) {
+                try { cancelAnimationFrame(subRafId); } catch (e) { }
+                subRafId = null;
+            }
+            if (subTimer) {
+                clearInterval(subTimer);
+                subTimer = null;
+            }
+        }
+
         function stopSubs() {
-            if (subTimer) clearInterval(subTimer);
-            subTimer = null;
+            stopSubtitleFrameLoop();
             currentCueText = '';
             const overlay = document.getElementById('custom-subs-overlay');
             const txtEl = overlay ? overlay.querySelector('span') : null;
@@ -7789,6 +7872,7 @@
                     }
                     vttBuffer += decoder.decode().replace(/\r/g, '');
                     drainCompleteBlocks();
+                    subtitleFullyLoaded[subIndex] = true;
                     paintCue();
                 } else {
                     const vttText = await res.text();
@@ -7800,6 +7884,7 @@
                         }
                     }
                     cues.sort((a, b) => a.s - b.s);
+                    subtitleFullyLoaded[subIndex] = true;
                     paintCue();
                 }
             } catch (err) {
@@ -7837,8 +7922,7 @@
 
             activeBitmapSubIdx = null;
             getSubtitleOverlay();
-            if (subTimer) clearInterval(subTimer);
-            subTimer = setInterval(paintCue, 60);
+            startSubtitleFrameLoop();
 
             const existing = parsedSubtitleCues[subIndex];
             if (existing && existing.length > 0) {
@@ -8094,6 +8178,8 @@
             shouldTranscodeDefault = false;
             parsedSubtitleCues = {};
             subtitleWindowStart = {};
+            subtitleFullyLoaded = {};
+            stopSubtitleFrameLoop();
             const aBtn = $('audioTrackBtn');
             if (aBtn) aBtn.classList.remove('dolby-active');
             const sBtn = $('subTrackBtn');
@@ -8103,6 +8189,7 @@
 
         // Secondary Audio Element Synchronization Listeners
         video.addEventListener('play', () => {
+            if (activeSubtitleStreamIdx !== null) startSubtitleFrameLoop();
             if (backendAudioCtx && backendAudioCtx.state === 'suspended') {
                 backendAudioCtx.resume().catch(() => { });
             }
@@ -8114,6 +8201,8 @@
 
         video.addEventListener('pause', () => {
             if (activeAudio) activeAudio.pause();
+            stopSubtitleFrameLoop();
+            paintCue();
         });
 
         video.addEventListener('timeupdate', () => {
@@ -8134,6 +8223,7 @@
         });
 
         video.addEventListener('playing', () => {
+            if (activeSubtitleStreamIdx !== null) startSubtitleFrameLoop();
         });
 
         video.addEventListener('ratechange', () => {
