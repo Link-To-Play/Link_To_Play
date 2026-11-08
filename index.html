@@ -5033,6 +5033,25 @@
                 clientAudioEngine.reset();
             }
 
+            try {
+                const segMatch = streamUrl.match(/\/stream\/(\d+)/);
+                if (segMatch && segMatch[1]) {
+                    const cached = parseFloat(localStorage.getItem('media_dur_' + segMatch[1]) || '0');
+                    if (cached > 30) {
+                        setTotalMediaDuration(cached);
+                    }
+                }
+                fetch(streamUrl, { method: 'HEAD' }).then(res => {
+                    const xDur = parseFloat(res.headers.get('x-media-duration') || '0');
+                    if (xDur > 30) {
+                        setTotalMediaDuration(xDur);
+                        if (segMatch && segMatch[1]) {
+                            try { localStorage.setItem('media_dur_' + segMatch[1], String(xDur)); } catch (e) {}
+                        }
+                    }
+                }).catch(() => {});
+            } catch (e) { }
+
             advanceLoader();
             showSpinner();
             metadataInspected = false;
@@ -5540,6 +5559,17 @@
 
         function getMediaDuration() {
             if (totalMediaDuration > 30) return totalMediaDuration;
+            try {
+                const sUrl = streamUrl || (video ? (video.currentSrc || video.src) : '');
+                const m = sUrl ? sUrl.match(/\/stream\/(\d+)/) : null;
+                if (m && m[1]) {
+                    const c = parseFloat(localStorage.getItem('media_dur_' + m[1]) || '0');
+                    if (c > 30) {
+                        totalMediaDuration = c;
+                        return c;
+                    }
+                }
+            } catch (e) { }
             const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
             if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 30) {
                 return video.duration;
@@ -7901,13 +7931,22 @@
             u.search = '';
             if (hash) u.searchParams.set('hash', hash);
             if (auds) u.searchParams.set('auds', auds);
-            const apiUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(u.toString()) : u.toString();
+            // CRITICAL: /api/tracks is a fast JSON API on the Go backend that natively supports CORS.
+            // Never pass through /api/proxy which causes 404 and fails track discovery!
+            const apiUrl = u.toString();
 
             try {
-                const res = await fetch(apiUrl, {
+                let res = await fetch(apiUrl, {
                     headers: { 'Accept': 'application/json' },
                     signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
                 });
+                if (!res.ok && typeof getEffectiveStreamUrl === 'function') {
+                    // Fallback to proxy only if direct fails
+                    res = await fetch(getEffectiveStreamUrl(apiUrl), {
+                        headers: { 'Accept': 'application/json' },
+                        signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
+                    });
+                }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const tracks = await res.json();
                 if (Array.isArray(tracks) && tracks.length >= 1) {
@@ -7916,6 +7955,7 @@
                         const d = parseFloat(t.format_duration || t.duration || '0');
                         if (d > 30) {
                             setTotalMediaDuration(d);
+                            try { localStorage.setItem('media_dur_' + seg, String(d)); } catch (e) { }
                             break;
                         }
                     }
@@ -8403,7 +8443,7 @@
             let timecodeScale = 1000000; // default 1,000,000 ns = 1 ms
 
             // Scan for Segment Info (0x15, 0x49, 0xa9, 0x66) in header
-            for (let i = 0; i < Math.min(buf.length - 8, 131072); i++) {
+            for (let i = 0; i < buf.length - 8; i++) {
                 if (buf[i] === 0x15 && buf[i + 1] === 0x49 && buf[i + 2] === 0xa9 && buf[i + 3] === 0x66) {
                     let pos = i + 4;
                     const infoSize = readVint(buf, pos);
