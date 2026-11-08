@@ -7324,7 +7324,7 @@
             return finalUrl;
         }
 
-        function buildSubtitleUrl(streamIndex, ss) {
+        function buildSubtitleUrl(streamIndex, ss, format) {
             let target = streamUrl;
             if (target.includes('/api/proxy?url=')) {
                 try {
@@ -7341,6 +7341,7 @@
             if (linkHash) u.searchParams.set('hash', linkHash);
             const ssVal = (ss !== undefined && ss !== null) ? Math.floor(ss) : 0;
             u.searchParams.set('ss', String(ssVal));
+            if (format) u.searchParams.set('fmt', format);
             return u.toString();
         }
 
@@ -7559,6 +7560,12 @@
         let subSeekDebounce = null;
         let subtitleStreamingActive = {};
         let subtitleFullyLoaded = {};
+        let jassubRenderer = null;
+        let jassubModulePromise = null;
+        let activePgsData = null;
+        let pgsCanvas = null;
+        let pgsCanvasCtx = null;
+        let pgsModulePromise = null;
 
         function isBitmapSubtitle(sub) {
             if (!sub) return false;
@@ -7738,8 +7745,195 @@
             return active;
         }
 
+        async function loadJassub() {
+            if (window.JASSUB) return window.JASSUB;
+            if (!jassubModulePromise) {
+                jassubModulePromise = import('https://esm.sh/jassub@2.5.36').then(m => {
+                    window.JASSUB = m.default;
+                    return m.default;
+                });
+            }
+            return jassubModulePromise;
+        }
+
+        async function initJassub(subIndex, url) {
+            destroyJassub();
+            try {
+                const JASSUB = await loadJassub();
+                const workerCode = `import "https://cdn.jsdelivr.net/npm/jassub@2.5.36/dist/worker/worker.js";`;
+                const workerBlob = new Blob([workerCode], { type: 'application/javascript' });
+                const workerUrl = URL.createObjectURL(workerBlob);
+
+                jassubRenderer = new JASSUB({
+                    video: video,
+                    subUrl: url,
+                    workerUrl: workerUrl,
+                    wasmUrl: 'https://cdn.jsdelivr.net/npm/jassub@2.5.36/dist/wasm/jassub-worker.wasm',
+                    modernWasmUrl: 'https://cdn.jsdelivr.net/npm/jassub@2.5.36/dist/wasm/jassub-worker-modern.wasm',
+                    defaultFontUrl: 'https://cdn.jsdelivr.net/npm/jassub@2.5.36/dist/default.woff2',
+                    prescaleFactor: 1.0,
+                    prescaleHeightLimit: 1080,
+                    maxRenderHeight: 2160
+                });
+            } catch (err) {
+                console.warn('[JASSUB] Initialization error:', err);
+                fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, 0, 'vtt'));
+            }
+        }
+
+        function destroyJassub() {
+            if (jassubRenderer) {
+                try { jassubRenderer.destroy(); } catch (e) { }
+                jassubRenderer = null;
+            }
+        }
+
+        function getPgsCanvas() {
+            if (!pgsCanvas && stage) {
+                pgsCanvas = document.createElement('canvas');
+                pgsCanvas.id = 'pgs-subs-canvas';
+                pgsCanvas.style.cssText = 'position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:21; object-fit:contain;';
+                stage.appendChild(pgsCanvas);
+                pgsCanvasCtx = pgsCanvas.getContext('2d');
+            }
+            return pgsCanvas;
+        }
+
+        function clearPgsCanvas() {
+            if (pgsCanvas && pgsCanvasCtx) {
+                pgsCanvasCtx.clearRect(0, 0, pgsCanvas.width, pgsCanvas.height);
+            }
+        }
+
+        async function loadPgsParser() {
+            if (window.pgsParser) return window.pgsParser;
+            if (!pgsModulePromise) {
+                pgsModulePromise = import('https://esm.sh/pgs-parser@0.1.1').then(m => {
+                    window.pgsParser = m;
+                    return m;
+                });
+            }
+            return pgsModulePromise;
+        }
+
+        async function fetchAndParsePgs(subIndex, url) {
+            clearPgsCanvas();
+            activePgsData = [];
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                const { parseDisplaySets } = await loadPgsParser();
+                
+                const cues = [];
+                if (res.body && typeof res.body.pipeThrough === 'function') {
+                    const stream = res.body.pipeThrough(parseDisplaySets());
+                    const reader = stream.getReader();
+                    while (true) {
+                        const { done, value: ds } = await reader.read();
+                        if (done) break;
+                        const pcs = ds ? ds.presentationCompositionSegment : null;
+                        if (pcs) {
+                            const pts = (pcs.pts || 0) / 90000;
+                            if (ds.objectDefinitionSegments && ds.objectDefinitionSegments.length > 0) {
+                                try {
+                                    const imgData = ds.imageData();
+                                    const win = (ds.windowDefinitionSegments && ds.windowDefinitionSegments[0]) || {};
+                                    cues.push({
+                                        s: pts,
+                                        e: pts + 4.0,
+                                        imgData: imgData,
+                                        x: win.x || win.windowX || 0,
+                                        y: win.y || win.windowY || 0,
+                                        width: imgData.width,
+                                        height: imgData.height
+                                    });
+                                } catch (e) { }
+                            } else {
+                                if (cues.length > 0) {
+                                    cues[cues.length - 1].e = pts;
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    const ab = await res.arrayBuffer();
+                    const stream = new ReadableStream({
+                        start(controller) {
+                            controller.enqueue(new Uint8Array(ab));
+                            controller.close();
+                        }
+                    }).pipeThrough(parseDisplaySets());
+                    const reader = stream.getReader();
+                    while (true) {
+                        const { done, value: ds } = await reader.read();
+                        if (done) break;
+                        const pcs = ds ? ds.presentationCompositionSegment : null;
+                        if (pcs) {
+                            const pts = (pcs.pts || 0) / 90000;
+                            if (ds.objectDefinitionSegments && ds.objectDefinitionSegments.length > 0) {
+                                try {
+                                    const imgData = ds.imageData();
+                                    const win = (ds.windowDefinitionSegments && ds.windowDefinitionSegments[0]) || {};
+                                    cues.push({
+                                        s: pts,
+                                        e: pts + 4.0,
+                                        imgData: imgData,
+                                        x: win.x || win.windowX || 0,
+                                        y: win.y || win.windowY || 0,
+                                        width: imgData.width,
+                                        height: imgData.height
+                                    });
+                                } catch (e) { }
+                            } else {
+                                if (cues.length > 0) {
+                                    cues[cues.length - 1].e = pts;
+                                }
+                            }
+                        }
+                    }
+                }
+                activePgsData = cues;
+                subtitleFullyLoaded[subIndex] = true;
+                paintPgsCue();
+            } catch (err) {
+                console.error('[PGS] Failed to parse PGS stream:', err);
+            }
+        }
+
+        function paintPgsCue(currentTime) {
+            if (!activePgsData || activePgsData.length === 0 || !video) {
+                clearPgsCanvas();
+                return;
+            }
+            const canvas = getPgsCanvas();
+            if (!canvas || !pgsCanvasCtx) return;
+
+            if (canvas.width !== (video.videoWidth || 1920) || canvas.height !== (video.videoHeight || 1080)) {
+                canvas.width = video.videoWidth || 1920;
+                canvas.height = video.videoHeight || 1080;
+            }
+
+            const mediaTime = (typeof currentTime === 'number' && isFinite(currentTime)) ? currentTime : (video ? (video.currentTime || 0) : 0);
+            const t = mediaTime + subtitleSyncOffset;
+
+            const match = activePgsData.find(item => t >= item.s && t <= item.e);
+            pgsCanvasCtx.clearRect(0, 0, canvas.width, canvas.height);
+            if (match && match.imgData) {
+                try {
+                    pgsCanvasCtx.putImageData(match.imgData, match.x, match.y);
+                } catch (e) { }
+            }
+        }
+
         function paintCue(currentTime) {
-            if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) {
+            if (activeBitmapSubIdx !== null) {
+                paintPgsCue(currentTime);
+                return;
+            }
+            if (jassubRenderer) {
+                return;
+            }
+            if (activeSubtitleStreamIdx === null) {
                 stopSubs();
                 return;
             }
@@ -7772,11 +7966,11 @@
 
         function startSubtitleFrameLoop() {
             stopSubtitleFrameLoop();
-            if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null || !video) return;
+            if (activeSubtitleStreamIdx === null || !video) return;
 
             if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
                 const onFrame = (now, metadata) => {
-                    if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) return;
+                    if (activeSubtitleStreamIdx === null) return;
                     paintCue(metadata ? metadata.mediaTime : video.currentTime);
                     if (!video.paused && !video.ended) {
                         subFrameCallbackId = video.requestVideoFrameCallback(onFrame);
@@ -7785,7 +7979,7 @@
                 subFrameCallbackId = video.requestVideoFrameCallback(onFrame);
             } else {
                 const onRaf = () => {
-                    if (activeSubtitleStreamIdx === null || activeBitmapSubIdx !== null) return;
+                    if (activeSubtitleStreamIdx === null) return;
                     paintCue(video.currentTime);
                     if (!video.paused && !video.ended) {
                         subRafId = requestAnimationFrame(onRaf);
@@ -7812,6 +8006,8 @@
 
         function stopSubs() {
             stopSubtitleFrameLoop();
+            destroyJassub();
+            clearPgsCanvas();
             currentCueText = '';
             const overlay = document.getElementById('custom-subs-overlay');
             const txtEl = overlay ? overlay.querySelector('span') : null;
@@ -7896,7 +8092,7 @@
             }
         }
 
-        function selectSubtitleTrack(subIndex) {
+        async function selectSubtitleTrack(subIndex) {
             stopSubs();
             activeSubtitleStreamIdx = subIndex;
             activeBackendSubIndex = subIndex;
@@ -7914,26 +8110,35 @@
             const track = backendSubTracks.find(t => t.index === subIndex);
             if (!track) return;
 
-            if (track.isBitmap) {
-                activeBitmapSubIdx = subIndex;
-                showSubToast('Bitmap subtitles only supported in VLC/external player');
-                return;
-            }
-
-            activeBitmapSubIdx = null;
-            getSubtitleOverlay();
-            startSubtitleFrameLoop();
-
-            const existing = parsedSubtitleCues[subIndex];
-            if (existing && existing.length > 0) {
-                paintCue();
-            } else if (!subtitleStreamingActive[subIndex]) {
-                fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, 0));
-            }
-
             renderSubTrackUI(backendSubTracks, subIndex);
             if (subTrackBtn) subTrackBtn.classList.add('sub-active');
-            showSubToast(`Subtitles: ${track.lang}`);
+
+            const isAss = (track.rawCodec || '').toLowerCase().includes('ass') || (track.rawCodec || '').toLowerCase().includes('ssa');
+            const isPgs = track.isBitmap;
+
+            if (isAss) {
+                activeBitmapSubIdx = null;
+                showSubToast(`Subtitles: ${track.lang} (Stylized ASS)`);
+                initJassub(subIndex, buildSubtitleUrl(subIndex, 0, 'ass'));
+            } else if (isPgs) {
+                activeBitmapSubIdx = subIndex;
+                showSubToast(`Subtitles: ${track.lang} (BluRay PGS)`);
+                getPgsCanvas();
+                startSubtitleFrameLoop();
+                fetchAndParsePgs(subIndex, buildSubtitleUrl(subIndex, 0, 'sup'));
+            } else {
+                activeBitmapSubIdx = null;
+                getSubtitleOverlay();
+                startSubtitleFrameLoop();
+
+                const existing = parsedSubtitleCues[subIndex];
+                if (existing && existing.length > 0) {
+                    paintCue();
+                } else if (!subtitleStreamingActive[subIndex]) {
+                    fetchSubtitleStream(subIndex, buildSubtitleUrl(subIndex, 0));
+                }
+                showSubToast(`Subtitles: ${track.lang}`);
+            }
         }
 
         function cycleSubtitleTrack() {
@@ -7941,17 +8146,12 @@
                 showSubToast('No subtitles available');
                 return;
             }
-            const textSubs = backendSubTracks.filter(t => !t.isBitmap);
-            if (textSubs.length === 0) {
-                showSubToast('Bitmap subtitles only supported in VLC/external player');
-                return;
-            }
             if (activeBackendSubIndex === -1 || activeBackendSubIndex === null) {
-                selectSubtitleTrack(textSubs[0].index);
+                selectSubtitleTrack(backendSubTracks[0].index);
             } else {
-                const curPos = textSubs.findIndex(t => t.index === activeBackendSubIndex);
-                if (curPos >= 0 && curPos < textSubs.length - 1) {
-                    selectSubtitleTrack(textSubs[curPos + 1].index);
+                const curPos = backendSubTracks.findIndex(t => t.index === activeBackendSubIndex);
+                if (curPos >= 0 && curPos < backendSubTracks.length - 1) {
+                    selectSubtitleTrack(backendSubTracks[curPos + 1].index);
                 } else {
                     selectSubtitleTrack(-1);
                 }
@@ -8168,6 +8368,9 @@
         function resetBackendSync() {
             destroyAudio();
             stopSubs();
+            destroyJassub();
+            clearPgsCanvas();
+            activePgsData = null;
             backendAudioTracks = [];
             backendSubTracks = [];
             activeBackendAudioIndex = 0;
