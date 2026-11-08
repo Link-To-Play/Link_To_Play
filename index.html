@@ -7054,13 +7054,13 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                             this.audioCtx = new AudioContextClass();
                         }
 
-                        // Dynamics compressor eliminates digital clipping and buzzing spikes during loud scenes
+                        // Transparent brickwall limiter protects against digital clipping without reducing default audio volume
                         try {
                             this.compressor = this.audioCtx.createDynamicsCompressor();
-                            this.compressor.threshold.setValueAtTime(-1.0, this.audioCtx.currentTime);
-                            this.compressor.knee.setValueAtTime(6.0, this.audioCtx.currentTime);
-                            this.compressor.ratio.setValueAtTime(4.0, this.audioCtx.currentTime);
-                            this.compressor.attack.setValueAtTime(0.003, this.audioCtx.currentTime);
+                            this.compressor.threshold.setValueAtTime(-0.5, this.audioCtx.currentTime);
+                            this.compressor.knee.setValueAtTime(3.0, this.audioCtx.currentTime);
+                            this.compressor.ratio.setValueAtTime(12.0, this.audioCtx.currentTime);
+                            this.compressor.attack.setValueAtTime(0.002, this.audioCtx.currentTime);
                             this.compressor.release.setValueAtTime(0.05, this.audioCtx.currentTime);
                         } catch (e) {
                             this.compressor = null;
@@ -7448,21 +7448,24 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                     const outR = new Float32Array(frames);
 
                     if (channels >= 6) {
-                        // Standard ITU-R BS.775 5.1 surround to stereo downmix with headroom normalization
+                        // Standard cinema stereo downmix with full dialogue clarity
                         const FL = planes[0];
                         const FR = planes[1];
                         const FC = planes[2];
                         const LFE = planes[3];
                         const SL = planes[4];
                         const SR = planes[5];
-                        const cGain = 0.7071;
-                        const sGain = 0.7071;
-                        const lfeGain = 0.5;
-                        const norm = 1.0 / (1.0 + cGain + sGain); // ~0.4142
+                        const cGain = 1.0;     // Full 100% dialogue volume from Center channel
+                        const sGain = 0.7071;  // Surrounds mixed at standard -3 dB
 
                         for (let i = 0; i < frames; i++) {
-                            outL[i] = (FL[i] + cGain * FC[i] + sGain * SL[i] + lfeGain * LFE[i]) * norm;
-                            outR[i] = (FR[i] + cGain * FC[i] + sGain * SR[i] + lfeGain * LFE[i]) * norm;
+                            let l = FL[i] + cGain * FC[i] + sGain * SL[i];
+                            let r = FR[i] + cGain * FC[i] + sGain * SR[i];
+                            // Soft-knee limiter prevents digital clipping during intense explosions
+                            if (l > 1.0 || l < -1.0) l = Math.tanh(l);
+                            if (r > 1.0 || r < -1.0) r = Math.tanh(r);
+                            outL[i] = l;
+                            outR[i] = r;
                         }
                     } else if (channels === 1) {
                         outL.set(planes[0]);
