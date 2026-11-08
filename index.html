@@ -8850,12 +8850,27 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
             // Never pass through /api/proxy which causes 404 and fails track discovery!
             const apiUrl = u.toString();
 
+            let res = null;
             try {
-                let res = await fetch(apiUrl, {
+                res = await fetch(apiUrl, {
                     headers: { 'Accept': 'application/json' },
                     signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
                 });
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            } catch (firstErr) {
+                // Quick retry in case backend was starting up or gateway just recovered
+                try {
+                    await new Promise(r => setTimeout(r, 1500));
+                    res = await fetch(apiUrl, {
+                        headers: { 'Accept': 'application/json' },
+                        signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                } catch (retryErr) {
+                    console.warn('[Backend] Track discovery failed after retry:', retryErr);
+                    return null;
+                }
+            }
                 const tracks = await res.json();
                 if (Array.isArray(tracks) && tracks.length >= 1) {
                     console.log('[Backend] Successfully loaded track specifications:', tracks);
@@ -10631,6 +10646,23 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                 }
                 if (event.data.url) {
                     loadStream(event.data.url, true);
+                }
+            } else if (event.data.type === 'SET_TRACKS' && Array.isArray(event.data.audioTracks)) {
+                console.log('[hari-player] Synchronized tracks received from parent frame:', event.data);
+                if (event.data.audioTracks.length > 0) {
+                    mediaFileInfo.audioTracks = event.data.audioTracks;
+                    mediaFileInfo.audioCount = event.data.audioTracks.length;
+                    if (Array.isArray(event.data.subTracks)) {
+                        mediaFileInfo.subTracks = event.data.subTracks;
+                    }
+                    if (event.data.video && typeof event.data.video === 'object') {
+                        if (event.data.video.codec) mediaFileInfo.video.codec = event.data.video.codec;
+                    }
+                    updateMediaInfoDisplay();
+                    renderAudioTrackUI(event.data.audioTracks, 0);
+                    if (window.clientAudioEngine) {
+                        clientAudioEngine.setTracks(event.data.audioTracks);
+                    }
                 }
             }
         });
