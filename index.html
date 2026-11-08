@@ -5549,10 +5549,20 @@
         function setTotalMediaDuration(newDur) {
             if (typeof newDur !== 'number' || !isFinite(newDur) || newDur <= 30) return;
             // Prevent smaller chunk buffer durations from overwriting established movie duration
-            if (totalMediaDuration > 180 && newDur < totalMediaDuration * 0.8) {
+            if (totalMediaDuration > 180 && newDur < totalMediaDuration * 0.9) {
+                return;
+            }
+            if (totalMediaDuration > 30 && newDur < totalMediaDuration) {
                 return;
             }
             totalMediaDuration = newDur;
+            try {
+                const sUrl = streamUrl || (video ? (video.currentSrc || video.src) : '');
+                const m = sUrl ? sUrl.match(/\/stream\/(\d+)/) : null;
+                if (m && m[1]) {
+                    localStorage.setItem('media_dur_' + m[1], String(newDur));
+                }
+            } catch (e) { }
             updateTimeLabel();
             paintSeek();
         }
@@ -5571,8 +5581,11 @@
                 }
             } catch (e) { }
             const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
-            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 30) {
-                return video.duration;
+            if (!isMapped && video && video.duration && isFinite(video.duration) && video.duration > 30) {
+                if (totalMediaDuration <= 30 && video.duration > 300) {
+                    setTotalMediaDuration(video.duration);
+                }
+                return totalMediaDuration > 30 ? totalMediaDuration : video.duration;
             }
             return 0;
         }
@@ -5876,7 +5889,7 @@
 
         video.addEventListener('durationchange', () => {
             const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
-            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
+            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 300 && totalMediaDuration <= 30) {
                 setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
@@ -5884,7 +5897,7 @@
         });
         video.addEventListener('loadedmetadata', () => {
             const isMapped = (!window.clientAudioEngine || !clientAudioEngine.active) && (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) && (video ? (video.currentSrc || video.src || '').includes('aud=') : false);
-            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
+            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 300 && totalMediaDuration <= 30) {
                 setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
@@ -6636,6 +6649,7 @@
                     try { body = (await res.clone().text()).slice(0, 200); } catch (_) { }
                     state.lastErr = 'HTTP ' + res.status + ' Range=' + headers.get('Range') + ' body=' + body;
                     console.warn('[AudioEngine:' + (label || 'fetch') + '] ' + state.lastErr);
+                    throw new Error('[AudioEngine:' + (label || 'fetch') + '] HTTP ' + res.status);
                 }
                 return res;
             };
@@ -6789,31 +6803,23 @@
 
                     if (!this.mediabunnyInput || this.currentSourceUrl !== streamUrl) {
                         this.currentSourceUrl = streamUrl;
-                        let srcUrl = (typeof getEffectiveStreamUrl === 'function') ? getEffectiveStreamUrl(streamUrl) : streamUrl;
-
-                        try {
-                            const source = this.makeUrlSource(mediabunny, srcUrl);
-                            this.mediabunnyInput = new mediabunny.Input({
-                                source,
-                                formats: mediabunny.ALL_FORMATS
-                            });
-                            this.mediabunnyTracks = await this.mediabunnyInput.getAudioTracks();
-                        } catch (urlErr) {
-                            if (!srcUrl.startsWith('/api/proxy') && !srcUrl.includes('/api/proxy?url=')) {
-                                srcUrl = `/api/proxy?url=${encodeURIComponent(streamUrl)}`;
-                                const source = this.makeUrlSource(mediabunny, srcUrl);
-                                this.mediabunnyInput = new mediabunny.Input({
-                                    source,
-                                    formats: mediabunny.ALL_FORMATS
-                                });
-                                this.mediabunnyTracks = await this.mediabunnyInput.getAudioTracks();
-                            } else {
-                                throw urlErr;
-                            }
+                        let srcUrl = streamUrl;
+                        if (srcUrl.includes('/api/proxy?url=')) {
+                            try {
+                                const m = srcUrl.match(/[?&]url=([^&]+)/);
+                                if (m && m[1]) srcUrl = decodeURIComponent(m[1]);
+                            } catch (e) { }
                         }
+
+                        const source = this.makeUrlSource(mediabunny, srcUrl);
+                        this.mediabunnyInput = new mediabunny.Input({
+                            source,
+                            formats: mediabunny.ALL_FORMATS
+                        });
+                        this.mediabunnyTracks = await this.mediabunnyInput.getAudioTracks();
                     }
 
-                    const mbTrack = this.mediabunnyTracks[index] || this.mediabunnyTracks[0];
+                    const mbTrack = this.mediabunnyTracks[index] || this.mediabunnyTracks.find(t => t.id === track.streamIndex) || this.mediabunnyTracks[0];
                     if (!mbTrack) throw new Error('No audio track available in demuxer');
 
                     if (typeof mbTrack.canDecode === 'function' && !(await mbTrack.canDecode())) {
@@ -7128,6 +7134,16 @@
             if (window.clientAudioEngine && clientAudioEngine.active) {
                 clientAudioEngine.checkSync();
             }
+        });
+
+        // Ensure AudioContext is immediately unblocked on user gestures
+        const unlockClientAudioContext = () => {
+            if (window.clientAudioEngine && clientAudioEngine.audioCtx && clientAudioEngine.audioCtx.state === 'suspended') {
+                clientAudioEngine.audioCtx.resume().catch(() => {});
+            }
+        };
+        ['pointerdown', 'click', 'touchstart', 'keydown'].forEach(ev => {
+            window.addEventListener(ev, unlockClientAudioContext, { capture: true, passive: true });
         });
 
         /* ================= BACKEND MULTI-TRACK AUDIO & WEBVTT SUBTITLE ENGINE ================= */
@@ -7944,13 +7960,6 @@
                     headers: { 'Accept': 'application/json' },
                     signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
                 });
-                if (!res.ok && typeof getEffectiveStreamUrl === 'function') {
-                    // Fallback to proxy only if direct fails
-                    res = await fetch(getEffectiveStreamUrl(apiUrl), {
-                        headers: { 'Accept': 'application/json' },
-                        signal: AbortSignal.timeout ? AbortSignal.timeout(6000) : undefined
-                    });
-                }
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const tracks = await res.json();
                 if (Array.isArray(tracks) && tracks.length >= 1) {
