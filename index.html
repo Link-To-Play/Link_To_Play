@@ -6212,29 +6212,7 @@
         setVolume(100);
         setTimeout(() => { isBooting = false; }, 1000);
 
-        /* Native volume change listener (fires on hardware buttons, media keys, bluetooth devices) */
-        video.addEventListener('volumechange', () => {
-            if (isBooting || isControlHubChangingVolume) return;
-            if (window.clientAudioEngine && clientAudioEngine.active) return;
-            const pct = video.muted ? 0 : Math.round(video.volume * 100);
-            if (volFill) {
-                volFill.style.height = pct + '%';
-                volFill.style.width = '100%';
-            }
-            if (volThumb) {
-                volThumb.style.bottom = pct + '%';
-                volThumb.style.left = '50%';
-            }
-            if (volPct) volPct.textContent = pct;
-            const p = pct === 0 ? ICON_MUTE : pct < 50 ? ICON_LOW : ICON_FULL;
-            $('icoVol').innerHTML = `<path d="${p}"/>`;
-            if (volPopIcon) volPopIcon.innerHTML = `<path d="${p}"/>`;
-            const edgeIco = $('icoVolEdge');
-            if (edgeIco) edgeIco.setAttribute('d', p);
 
-            // Show ONLY the sleek volume capsule HUD, keep the main player UI hidden
-            triggerVolHud(pct);
-        });
 
         /* ================= SETTINGS DRAWER ================= */
         function openModal(id) { $(id).classList.add('open'); }
@@ -10416,23 +10394,7 @@ registerProcessor('stream-audio-processor', StreamAudioProcessor);
                 triggerVolHud(next);
                 return; // Volume keys ONLY show volume capsule, do not wake UI
             }
-            else if (e.code === 'AudioVolumeUp' || e.key === 'AudioVolumeUp') {
-                e.preventDefault();
-                const current = getCurrentVolume();
-                const next = Math.min(100, current + 5);
-                setVolume(next);
-                triggerVolHud(next);
-                return;
-            }
-            else if (e.code === 'AudioVolumeDown' || e.key === 'AudioVolumeDown') {
-                e.preventDefault();
-                const current = getCurrentVolume();
-                const next = Math.max(0, current - 5);
-                setVolume(next);
-                triggerVolHud(next);
-                return;
-            }
-            else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M' || e.code === 'AudioVolumeMute' || e.key === 'AudioVolumeMute') {
+            else if (e.code === 'KeyM' || e.key === 'm' || e.key === 'M') {
                 const current = getCurrentVolume();
                 const next = (current > 0) ? 0 : (lastVol || 100);
                 setVolume(next);
