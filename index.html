@@ -5525,6 +5525,7 @@
         /* ================= BUFFER PROGRESS TRACKER ================= */
         let totalMediaDuration = 0;
         let streamSeekOffset = 0;
+        let streamSeekTimer = null;
 
         function setTotalMediaDuration(newDur) {
             if (typeof newDur !== 'number' || !isFinite(newDur) || newDur <= 30) return;
@@ -5539,38 +5540,142 @@
 
         function getMediaDuration() {
             if (totalMediaDuration > 30) return totalMediaDuration;
-            if (video.duration && isFinite(video.duration) && video.duration > 30) {
+            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 30) {
                 return video.duration;
             }
             return 0;
         }
 
         function getMediaCurrentTime() {
-            return video.currentTime || 0;
+            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            return (isMapped ? streamSeekOffset : 0) + (video.currentTime || 0);
+        }
+
+        function buildStreamUrlWithAudio(audioIdx, seekSec) {
+            let target = streamUrl;
+            if (target.includes('/api/proxy?url=')) {
+                try {
+                    const m = target.match(/[?&]url=([^&]+)/);
+                    if (m && m[1]) target = decodeURIComponent(m[1]);
+                } catch (e) { }
+            }
+            const u = new URL(target, window.location.href);
+            if (audioIdx === 0 && !shouldTranscodeDefault) {
+                u.searchParams.delete('aud');
+                u.searchParams.delete('audio');
+                u.searchParams.delete('ss');
+            } else {
+                u.searchParams.set('aud', String(audioIdx));
+                if (typeof seekSec === 'number' && seekSec > 0) {
+                    u.searchParams.set('ss', seekSec.toFixed(2));
+                } else {
+                    u.searchParams.delete('ss');
+                }
+            }
+            let finalUrl = u.toString();
+            if (typeof getEffectiveStreamUrl === 'function') {
+                finalUrl = getEffectiveStreamUrl(finalUrl);
+            }
+            return finalUrl;
+        }
+
+        function executeAudioMappedSeek(targetSec, optAudioIdx) {
+            clearTimeout(streamSeekTimer);
+            const aIdx = (typeof optAudioIdx === 'number') ? optAudioIdx : (typeof activeBackendAudioIndex === 'number' ? activeBackendAudioIndex : 0);
+            const dur = getMediaDuration();
+            targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
+
+            const isMapped = (aIdx > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+
+            if (!isMapped) {
+                // Native default stream (byte-range seekable!)
+                streamSeekOffset = 0;
+                const targetSrc = buildStreamUrlWithAudio(0);
+                const curSrc = video.currentSrc || video.src;
+                if (curSrc === targetSrc) {
+                    try { video.currentTime = targetSec; } catch (e) {}
+                    updateTimeLabel();
+                    paintSeek();
+                    return;
+                }
+            }
+
+            streamSeekOffset = targetSec;
+            updateTimeLabel();
+            paintSeek();
+
+            showSpinner();
+            const wasPlaying = (!video.paused && !video.ended);
+
+            const newUrl = buildStreamUrlWithAudio(aIdx, isMapped ? targetSec : 0);
+            const curSrc = video.currentSrc || video.src;
+
+            let ready = false;
+            const onReady = () => {
+                if (ready) return;
+                ready = true;
+                video.removeEventListener('loadedmetadata', onReady);
+                video.removeEventListener('canplay', onReady);
+                if (!isMapped && targetSec > 0) {
+                    try { video.currentTime = targetSec; } catch (e) {}
+                }
+                if (wasPlaying) {
+                    video.play().catch(() => {});
+                }
+                hideSpinner(true);
+            };
+
+            video.addEventListener('loadedmetadata', onReady, { once: true });
+            video.addEventListener('canplay', onReady, { once: true });
+
+            if (curSrc !== newUrl) {
+                video.src = newUrl;
+                video.load();
+            } else {
+                onReady();
+            }
         }
 
         function seekToTime(targetSec) {
             const dur = getMediaDuration();
             targetSec = Math.max(0, dur > 0 ? Math.min(dur - 0.5, targetSec) : targetSec);
-            streamSeekOffset = 0;
-            try { video.currentTime = targetSec; } catch (e) {}
-            updateTimeLabel();
-            paintSeek();
+            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+
+            if (isMapped) {
+                // Immediate UI update for smooth dragging & button feedback
+                streamSeekOffset = targetSec;
+                updateTimeLabel();
+                paintSeek();
+
+                // Debounce by 300ms so rapid clicking doesn't flood server
+                clearTimeout(streamSeekTimer);
+                streamSeekTimer = setTimeout(() => {
+                    executeAudioMappedSeek(targetSec);
+                }, 300);
+            } else {
+                streamSeekOffset = 0;
+                try { video.currentTime = targetSec; } catch (e) {}
+                updateTimeLabel();
+                paintSeek();
+            }
         }
 
         function getBufferedPct() {
             const dur = getMediaDuration();
             if (!dur || !video.buffered || !video.buffered.length) return 0;
             const cur = getMediaCurrentTime();
+            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            const offset = isMapped ? streamSeekOffset : 0;
             for (let i = 0; i < video.buffered.length; i++) {
-                const start = video.buffered.start(i);
-                const end = video.buffered.end(i);
+                const start = offset + video.buffered.start(i);
+                const end = offset + video.buffered.end(i);
                 if (start <= cur + 1.5 && cur <= end + 1.5) {
                     return Math.min(100, (end / dur) * 100);
                 }
             }
             try {
-                const lastEnd = video.buffered.end(video.buffered.length - 1);
+                const lastEnd = offset + video.buffered.end(video.buffered.length - 1);
                 return Math.min(100, (lastEnd / dur) * 100);
             } catch (e) {
                 return 0;
@@ -5740,14 +5845,16 @@
         });
 
         video.addEventListener('durationchange', () => {
-            if (video.duration && isFinite(video.duration) && video.duration > 180) {
+            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
             paintSeek();
         });
         video.addEventListener('loadedmetadata', () => {
-            if (video.duration && isFinite(video.duration) && video.duration > 180) {
+            const isMapped = (typeof activeBackendAudioIndex === 'number' && activeBackendAudioIndex > 0) || (typeof shouldTranscodeDefault !== 'undefined' && shouldTranscodeDefault);
+            if (!isMapped && video.duration && isFinite(video.duration) && video.duration > 180) {
                 setTotalMediaDuration(video.duration);
             }
             updateTimeLabel();
@@ -7340,9 +7447,8 @@
             destroyAudio();
             restoreVideoAudio();
             activeBackendAudioIndex = 0;
-            if (!video.paused) {
-                video.play().catch(() => { });
-            }
+            const curTime = getMediaCurrentTime();
+            executeAudioMappedSeek(curTime, 0);
         }
 
         function selectBackendAudioTrack(idx) {
@@ -7360,12 +7466,11 @@
             }
             showAudioToast(track.codec ? `${track.lang} • ${track.codec}` : track.lang);
 
-            if (idx === 0 && !shouldTranscodeDefault) {
-                switchToDefault();
-                return;
-            }
+            destroyAudio();
+            restoreVideoAudio();
 
-            switchToTrack(track.index);
+            const curTime = getMediaCurrentTime();
+            executeAudioMappedSeek(curTime, idx);
         }
 
         /* ── Subtitles Engine (Incremental WebVTT / SRT / ASS Streaming & Custom Overlay) ── */
@@ -7958,17 +8063,6 @@
 
         video.addEventListener('timeupdate', () => {
             paintCue();
-            if (activeTrackIdx !== null && activeAudio && !audioLoading && !video.paused && !video.seeking) {
-                const expectedAudioTime = (video.currentTime || 0) - startVideoTime;
-                const audioCurrent = (activeAudio.currentTime || 0);
-                const drift = expectedAudioTime - audioCurrent;
-                if (Math.abs(drift) > 2.5) {
-                    console.log('[AudioTrack] Sync drift detected (' + drift.toFixed(2) + 's). Re-syncing...');
-                    reloadAudio(video.currentTime);
-                } else if (Math.abs(drift) > 0.25 && isFinite(expectedAudioTime) && expectedAudioTime >= 0) {
-                    try { activeAudio.currentTime = expectedAudioTime; } catch (e) {}
-                }
-            }
         });
 
         video.addEventListener('seeked', () => {
@@ -7978,17 +8072,6 @@
 
         video.addEventListener('seeking', () => {
             paintCue();
-            if (activeTrackIdx === null || !activeAudio) return;
-            audioLoading = true;
-            silenceVideo();
-
-            clearTimeout(seekDebounce);
-            seekDebounce = setTimeout(() => {
-                const videoTime = video.currentTime;
-                if (activeTrackIdx !== null) {
-                    reloadAudio(videoTime);
-                }
-            }, 180);
         });
 
         video.addEventListener('waiting', () => {
@@ -7996,16 +8079,6 @@
         });
 
         video.addEventListener('playing', () => {
-            if (activeTrackIdx === null || !activeAudio) return;
-            if (!audioLoading) {
-                const drift = (video.currentTime || 0) - (startVideoTime + (activeAudio.currentTime || 0));
-                if (Math.abs(drift) > 2.5) {
-                    console.log('[AudioTrack] Sync drift detected (' + drift.toFixed(2) + 's). Re-syncing...');
-                    reloadAudio(video.currentTime);
-                } else {
-                    activeAudio.play().catch(() => { });
-                }
-            }
         });
 
         video.addEventListener('ratechange', () => {
